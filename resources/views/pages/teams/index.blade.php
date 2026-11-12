@@ -76,15 +76,16 @@ new #[Title('Teams')] class extends Component {
             @endcan
         </div>
 
-        <div class="mt-6 space-y-3">
+        <div class="mt-6 border-t border-zinc-200 dark:border-white/9">
             @forelse ($this->teams as $team)
-                <div class="flex items-center justify-between gap-4 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900" data-test="team-row">
+                <div class="flex items-center justify-between gap-4 border-b border-zinc-200 py-4 dark:border-white/9" data-test="team-row">
                     <div class="flex items-center gap-4">
+                        <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-zinc-200/80 font-display text-sm font-semibold text-zinc-700 dark:bg-white/8 dark:text-zinc-200" aria-hidden="true">{{ mb_strtoupper(mb_substr($team->name, 0, 1)) }}</span>
                         <div>
                             <div class="flex items-center gap-2">
-                                <span class="font-medium">{{ $team->name }}</span>
+                                <span class="font-medium text-zinc-950 dark:text-white">{{ $team->name }}</span>
                                 @if ($team->isCurrent)
-                                    <flux:badge color="zinc">{{ __('Current') }}</flux:badge>
+                                    <flux:badge size="sm" color="indigo">{{ __('Current') }}</flux:badge>
                                 @endif
                             </div>
                             @unless ($team->isMember)

@@ -25,14 +25,22 @@ new #[Layout('layouts::admin')] #[Title('New team')] class extends AdminComponen
 }; ?>
 
 <section class="w-full">
-    <x-admin.page-heading :heading="__('New team')" :subheading="__('Members can be added once the team is created')" />
+    <x-admin.page-heading :heading="__('New team')" :subheading="__('Members can be added once the team is created')">
+        <x-slot:actions>
+            <flux:button variant="ghost" icon="arrow-left" :href="route('admin.teams.index')" wire:navigate>{{ __('All teams') }}</flux:button>
+        </x-slot:actions>
+    </x-admin.page-heading>
 
-    <form wire:submit="save" class="max-w-lg space-y-6">
-        <flux:input wire:model="name" :label="__('Team name')" required autofocus data-test="admin-team-name" />
+    <div data-rise>
+        <x-form-section :heading="__('Details')" :description="__('Pick a name people will recognise in the team switcher.')">
+            <form wire:submit="save" class="space-y-5">
+                <flux:input wire:model="name" :label="__('Team name')" required autofocus data-test="admin-team-name" />
 
-        <div class="flex gap-2">
-            <flux:button variant="primary" type="submit" data-test="admin-team-save">{{ __('Create team') }}</flux:button>
-            <flux:button variant="ghost" :href="route('admin.teams.index')" wire:navigate>{{ __('Cancel') }}</flux:button>
-        </div>
-    </form>
+                <div class="flex gap-2">
+                    <flux:button variant="primary" type="submit" data-test="admin-team-save">{{ __('Create team') }}</flux:button>
+                    <flux:button variant="ghost" :href="route('admin.teams.index')" wire:navigate>{{ __('Cancel') }}</flux:button>
+                </div>
+            </form>
+        </x-form-section>
+    </div>
 </section>

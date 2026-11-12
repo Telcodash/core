@@ -231,6 +231,73 @@ class AdminUsersTest extends TestCase
         $this->assertTrue($advisor->isCurrentTeam($support));
     }
 
+    public function test_only_assigned_teams_are_listed_and_others_are_found_by_search(): void
+    {
+        [$sales] = $this->managedTeam('Sales');
+        $this->managedTeam('Support North');
+        $this->managedTeam('Support South');
+        $this->managedTeam('Billing');
+        $advisor = User::factory()->advisor()->forTeam($sales)->create();
+
+        $component = Livewire::test('pages::admin.users.edit', ['user' => $advisor])
+            ->assertSee('Sales')
+            ->assertDontSee('Support North')
+            ->assertDontSee('Billing')
+            ->set('teamSearch', 'support')
+            ->assertSee('Support North')
+            ->assertSee('Support South')
+            ->assertDontSee('Billing');
+
+        // Teams the user is already on never appear as search results.
+        $component->set('teamSearch', 'sal');
+        $this->assertTrue($component->instance()->teamResults->isEmpty());
+    }
+
+    public function test_a_team_can_be_changed_through_search_and_saved(): void
+    {
+        [$sales] = $this->managedTeam('Sales');
+        [$support] = $this->managedTeam('Support');
+        $advisor = User::factory()->advisor()->forTeam($sales)->create();
+
+        Livewire::test('pages::admin.users.edit', ['user' => $advisor])
+            ->call('startChangingTeam', $sales->id)
+            ->assertSet('replacingTeamId', $sales->id)
+            ->set('teamSearch', 'Supp')
+            ->call('addTeam', $support->id)
+            ->assertSet('teams', [(string) $support->id])
+            ->assertSet('replacingTeamId', null)
+            ->assertSet('teamSearch', '')
+            ->call('updateTeams')
+            ->assertHasNoErrors();
+
+        $advisor->refresh();
+
+        $this->assertFalse($advisor->belongsToTeam($sales));
+        $this->assertTrue($advisor->belongsToTeam($support));
+    }
+
+    public function test_team_changes_are_staged_until_saved(): void
+    {
+        [$sales, $manager] = $this->managedTeam('Sales');
+        [$support] = $this->managedTeam('Support');
+
+        $component = Livewire::test('pages::admin.users.edit', ['user' => $manager])
+            ->assertDontSeeHtml('data-test="admin-user-save-teams"')
+            ->call('addTeam', $support->id)
+            ->call('removeTeam', $sales->id)
+            ->assertSet('teams', [(string) $support->id])
+            ->assertSeeHtml('data-test="admin-user-save-teams"');
+
+        // Nothing is persisted until saved...
+        $this->assertTrue($manager->fresh()->belongsToTeam($sales));
+        $this->assertFalse($manager->fresh()->belongsToTeam($support));
+
+        // ...and discarding restores the saved memberships.
+        $component->call('discardTeamChanges')
+            ->assertSet('teams', [(string) $sales->id])
+            ->assertDontSeeHtml('data-test="admin-user-save-teams"');
+    }
+
     public function test_team_reassignment_cannot_strand_advisors(): void
     {
         [$sales, $manager] = $this->managedTeam('Sales');

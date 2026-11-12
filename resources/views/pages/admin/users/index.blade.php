@@ -159,7 +159,7 @@ new #[Layout('layouts::admin')] #[Title('Users')] class extends AdminComponent {
                 <flux:table.row :key="$user->id" data-test="admin-user-row">
                     <flux:table.cell variant="strong">
                         <div class="flex items-center gap-3">
-                            <flux:avatar size="xs" :name="$user->name" :initials="$user->initials()" />
+                            <flux:avatar size="xs" color="auto" circle :name="$user->name" :initials="$user->initials()" />
                             <flux:link :href="route('admin.users.edit', $user)" wire:navigate>{{ $user->name }}</flux:link>
                             @if (auth()->user()->is($user))
                                 <flux:badge size="sm">{{ __('You') }}</flux:badge>

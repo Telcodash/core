@@ -79,16 +79,22 @@ new class extends Component {
 }; ?>
 
 <div>
-    <flux:dropdown position="bottom" align="start">
-        <flux:button variant="ghost" class="group w-full justify-start in-data-flux-sidebar-collapsed-desktop:justify-center" data-test="team-switcher-trigger">
-            <flux:icon name="users" class="hidden size-4 in-data-flux-sidebar-collapsed-desktop:block" />
-            <span class="truncate font-semibold in-data-flux-sidebar-collapsed-desktop:hidden">{{ $this->currentTeam()['name'] ?? __('Select team') }}</span>
+    <flux:dropdown position="bottom" align="start" class="block w-full">
+        <button type="button" class="group flex w-full items-center gap-3 rounded-xl bg-white/[0.06] p-2 text-start ring-1 ring-white/8 transition-colors duration-(--dur-fast) ring-inset hover:bg-white/10 in-data-flux-sidebar-collapsed-desktop:justify-center" data-test="team-switcher-trigger">
+            @php($current = $this->currentTeam())
+            <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-attention font-display text-sm font-semibold text-zinc-950" aria-hidden="true">
+                {{ $current ? mb_strtoupper(mb_substr($current['name'], 0, 1)) : '?' }}
+            </span>
+            <span class="grid min-w-0 flex-1 leading-tight in-data-flux-sidebar-collapsed-desktop:hidden">
+                <span class="text-[11px] text-white/45">{{ __('Team') }}</span>
+                <span class="truncate text-sm font-medium text-white">{{ $current['name'] ?? __('Select team') }}</span>
+            </span>
             <flux:icon
                 name="chevrons-up-down"
                 variant="micro"
-                class="ms-auto size-4 in-data-flux-sidebar-collapsed-desktop:hidden"
+                class="ms-auto size-4 text-white/40 transition-colors group-hover:text-white/80 in-data-flux-sidebar-collapsed-desktop:hidden"
             />
-        </flux:button>
+        </button>
 
         <flux:menu class="min-w-56">
             <flux:menu.heading>{{ __('Teams') }}</flux:menu.heading>

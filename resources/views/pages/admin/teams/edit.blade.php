@@ -136,26 +136,22 @@ new #[Layout('layouts::admin')] class extends AdminComponent {
         </x-slot:actions>
     </x-admin.page-heading>
 
-    <div class="max-w-3xl space-y-10">
-        @if ($this->needsManager)
-            <flux:callout variant="danger" icon="exclamation-triangle" :heading="__('This team has advisors but no manager.')" data-test="admin-team-needs-manager">
-                <flux:callout.text>{{ __('Add a manager so its advisors are managed.') }}</flux:callout.text>
-            </flux:callout>
-        @endif
+    @if ($this->needsManager)
+        <flux:callout variant="danger" icon="exclamation-triangle" class="mb-10" :heading="__('This team has advisors but no manager.')" data-test="admin-team-needs-manager">
+            <flux:callout.text>{{ __('Add a manager so its advisors are managed.') }}</flux:callout.text>
+        </flux:callout>
+    @endif
 
-        <form wire:submit="rename" class="max-w-lg space-y-4">
-            <flux:heading>{{ __('Details') }}</flux:heading>
-            <flux:input wire:model="name" :label="__('Team name')" required data-test="admin-team-name" />
-            <flux:button variant="primary" type="submit" data-test="admin-team-save">{{ __('Save') }}</flux:button>
-        </form>
+    <div data-rise>
+        <x-form-section :heading="__('Details')" :description="__('The team name is shown in the team switcher and on the dashboard.')">
+            <form wire:submit="rename" class="space-y-5">
+                <flux:input wire:model="name" :label="__('Team name')" required data-test="admin-team-name" />
+                <flux:button variant="primary" type="submit" data-test="admin-team-save">{{ __('Save') }}</flux:button>
+            </form>
+        </x-form-section>
 
-        <div class="space-y-4">
-            <div>
-                <flux:heading>{{ __('Members') }}</flux:heading>
-                <flux:subheading>{{ __('Advisors must always belong to at least one team with a manager.') }}</flux:subheading>
-            </div>
-
-            <form wire:submit="addMember" class="flex max-w-lg items-end gap-2">
+        <x-form-section :heading="__('Members')" :description="__('Advisors must always belong to at least one team with a manager.')">
+            <form wire:submit="addMember" class="flex items-end gap-2">
                 <div class="flex-1">
                     <flux:select wire:model="newMemberId" :label="__('Add a member')" :placeholder="__('Choose a user...')" data-test="admin-team-add-member-select">
                         @foreach ($this->availableUsers as $user)
@@ -167,51 +163,38 @@ new #[Layout('layouts::admin')] class extends AdminComponent {
             </form>
             <flux:error name="newMemberId" />
 
-            <flux:table>
-                <flux:table.columns>
-                    <flux:table.column>{{ __('Name') }}</flux:table.column>
-                    <flux:table.column>{{ __('Email') }}</flux:table.column>
-                    <flux:table.column>{{ __('Role') }}</flux:table.column>
-                    <flux:table.column align="end"><span class="sr-only">{{ __('Actions') }}</span></flux:table.column>
-                </flux:table.columns>
-                <flux:table.rows>
-                    @forelse ($this->members as $member)
-                        <flux:table.row :key="$member->id" data-test="admin-team-member-row">
-                            <flux:table.cell variant="strong">
-                                <flux:link :href="route('admin.users.edit', $member)" wire:navigate>{{ $member->name }}</flux:link>
-                            </flux:table.cell>
-                            <flux:table.cell>{{ $member->email }}</flux:table.cell>
-                            <flux:table.cell><flux:badge size="sm" :color="$member->role->badgeColor()">{{ $member->role->label }}</flux:badge></flux:table.cell>
-                            <flux:table.cell align="end">
-                                <flux:button
-                                    variant="ghost"
-                                    size="sm"
-                                    icon="x-mark"
-                                    wire:click="removeMember({{ $member->id }})"
-                                    wire:confirm="{{ __('Remove :name from this team?', ['name' => $member->name]) }}"
-                                    :tooltip="__('Remove from team')"
-                                    data-test="admin-team-remove-member"
-                                />
-                            </flux:table.cell>
-                        </flux:table.row>
-                    @empty
-                        <flux:table.row>
-                            <flux:table.cell colspan="4" class="text-center text-zinc-500">{{ __('This team has no members yet.') }}</flux:table.cell>
-                        </flux:table.row>
-                    @endforelse
-                </flux:table.rows>
-            </flux:table>
-        </div>
+            <ul role="list" class="mt-6 border-t border-zinc-200 dark:border-white/9">
+                @forelse ($this->members as $member)
+                    <li wire:key="member-{{ $member->id }}" class="flex items-center gap-3 border-b border-zinc-200 py-3 dark:border-white/9" data-test="admin-team-member-row">
+                        <flux:avatar size="sm" :name="$member->name" :initials="$member->initials()" color="auto" circle />
+                        <div class="min-w-0 flex-1">
+                            <flux:link :href="route('admin.users.edit', $member)" wire:navigate class="text-sm font-medium">{{ $member->name }}</flux:link>
+                            <p class="truncate text-xs text-zinc-500 dark:text-zinc-400">{{ $member->email }}</p>
+                        </div>
+                        <flux:badge size="sm" :color="$member->role->badgeColor()">{{ $member->role->label }}</flux:badge>
+                        <flux:button
+                            variant="ghost"
+                            size="sm"
+                            icon="x-mark"
+                            wire:click="removeMember({{ $member->id }})"
+                            wire:confirm="{{ __('Remove :name from this team?', ['name' => $member->name]) }}"
+                            :tooltip="__('Remove from team')"
+                            data-test="admin-team-remove-member"
+                        />
+                    </li>
+                @empty
+                    <li class="py-6">
+                        <x-empty-state icon="user-plus" :heading="__('This team has no members yet.')" :description="__('Add a manager first, then the advisors they look after.')" />
+                    </li>
+                @endforelse
+            </ul>
+        </x-form-section>
 
-        <div class="space-y-4 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-200/10 dark:bg-red-900/20">
-            <div>
-                <flux:heading class="text-red-700! dark:text-red-100!">{{ __('Delete team') }}</flux:heading>
-                <flux:text class="text-red-700 dark:text-red-100">{{ __('Members are removed from the team. Advisors who depend on it must be moved first.') }}</flux:text>
-            </div>
+        <x-form-section :heading="__('Delete team')" :description="__('Members are removed from the team. Advisors who depend on it must be moved first.')" danger>
             <flux:modal.trigger name="delete-team">
-                <flux:button variant="danger" data-test="admin-delete-team-button">{{ __('Delete team') }}</flux:button>
+                <flux:button variant="danger" icon="trash" data-test="admin-delete-team-button">{{ __('Delete team') }}</flux:button>
             </flux:modal.trigger>
-        </div>
+        </x-form-section>
     </div>
 
     <flux:modal name="delete-team" class="max-w-lg">

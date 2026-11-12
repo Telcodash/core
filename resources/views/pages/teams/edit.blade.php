@@ -144,19 +144,19 @@ new class extends Component
                     @endif
                 </div>
 
-                <div class="space-y-3">
+                <div class="border-t border-zinc-200 dark:border-white/9">
                     @forelse ($members as $member)
-                        <div class="flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900" data-test="member-row">
+                        <div class="flex items-center justify-between gap-4 border-b border-zinc-200 py-3.5 dark:border-white/9" data-test="member-row">
                             <div class="flex items-center gap-4">
-                                <flux:avatar :name="$member['name']" :initials="$member['initials']" />
+                                <flux:avatar :name="$member['name']" :initials="$member['initials']" color="auto" circle />
                                 <div>
-                                    <div class="font-medium">{{ $member['name'] }}</div>
+                                    <div class="font-medium text-zinc-950 dark:text-white">{{ $member['name'] }}</div>
                                     <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">{{ $member['email'] }}</flux:text>
                                 </div>
                             </div>
 
                             <div class="flex items-center gap-2">
-                                <flux:badge color="zinc" data-test="member-role">{{ $member['role_label'] }}</flux:badge>
+                                <flux:badge size="sm" color="zinc" data-test="member-role">{{ $member['role_label'] }}</flux:badge>
 
                                 @if ($member['can_remove'])
                                     <flux:modal.trigger name="remove-member-{{ $member['id'] }}">

@@ -101,48 +101,62 @@ new #[Layout('layouts::admin')] #[Title('New user')] class extends AdminComponen
 }; ?>
 
 <section class="w-full">
-    <x-admin.page-heading :heading="__('New user')" :subheading="__('Create an account and assign it to a team')" />
+    <x-admin.page-heading :heading="__('New user')" :subheading="__('Create an account and assign it to a team')">
+        <x-slot:actions>
+            <flux:button variant="ghost" icon="arrow-left" :href="route('admin.users.index')" wire:navigate>{{ __('All users') }}</flux:button>
+        </x-slot:actions>
+    </x-admin.page-heading>
 
-    <form wire:submit="save" class="max-w-lg space-y-6">
-        <flux:input wire:model="name" :label="__('Name')" required autofocus autocomplete="off" data-test="admin-user-name" />
-        <flux:input wire:model="email" :label="__('Email')" type="email" required autocomplete="off" data-test="admin-user-email" />
-        <flux:input wire:model="password" :label="__('Password')" type="password" required viewable autocomplete="new-password" data-test="admin-user-password" />
-        <flux:input wire:model="password_confirmation" :label="__('Confirm password')" type="password" required viewable autocomplete="new-password" />
+    <form wire:submit="save" data-rise>
+        <x-form-section :heading="__('Account')" :description="__('The person signs in with this email address and password.')">
+            <div class="space-y-5">
+                <flux:input wire:model="name" :label="__('Name')" required autofocus autocomplete="off" data-test="admin-user-name" />
+                <flux:input wire:model="email" :label="__('Email')" type="email" required autocomplete="off" data-test="admin-user-email" />
+                <div class="grid gap-5 sm:grid-cols-2">
+                    <flux:input wire:model="password" :label="__('Password')" type="password" required viewable autocomplete="new-password" data-test="admin-user-password" />
+                    <flux:input wire:model="password_confirmation" :label="__('Confirm password')" type="password" required viewable autocomplete="new-password" />
+                </div>
+            </div>
+        </x-form-section>
 
-        <flux:select wire:model.live="role" :label="__('Role')" data-test="admin-user-role">
-            @foreach ($this->roles as $roleOption)
-                <flux:select.option :value="$roleOption->name">{{ $roleOption->label }}</flux:select.option>
-            @endforeach
-        </flux:select>
-
-        <flux:fieldset>
-            <flux:legend>{{ __('Team') }}</flux:legend>
-            <flux:description>
-                @if ($this->selectedRole->requiresTeamManager())
-                    {{ __(':role users must join a team that has a manager.', ['role' => $this->selectedRole->label]) }}
-                @elseif ($this->selectedRole->isManager())
-                    {{ __('Managers must join an existing team or create a new one.') }}
-                @else
-                    {{ __('Administrators can see every team, so a team is optional.') }}
-                @endif
-            </flux:description>
-
-            <div class="mt-3 space-y-4">
-                <flux:select wire:model.live="team":disabled="filled($newTeam)" data-test="admin-user-team">
-                    <flux:select.option value="">{{ __('No existing team') }}</flux:select.option>
-                    @foreach ($this->teams as $teamOption)
-                        <flux:select.option :value="$teamOption->slug">{{ $teamOption->name }}</flux:select.option>
+        <x-form-section :heading="__('Role and team')" :description="__('The role decides what this person can see and do.')">
+            <div class="space-y-5">
+                <flux:select wire:model.live="role" :label="__('Role')" data-test="admin-user-role">
+                    @foreach ($this->roles as $roleOption)
+                        <flux:select.option :value="$roleOption->name">{{ $roleOption->label }}</flux:select.option>
                     @endforeach
                 </flux:select>
-                <flux:error name="team" />
 
-                @if ($this->selectedRole->canCreateTeams())
-                    <flux:input wire:model.live.blur="newTeam" :label="__('Or create a new team')" :placeholder="__('New team name')" :disabled="$team !== ''" data-test="admin-user-new-team" />
-                @endif
+                <flux:fieldset>
+                    <flux:legend>{{ __('Team') }}</flux:legend>
+                    <flux:description>
+                        @if ($this->selectedRole->requiresTeamManager())
+                            {{ __(':role users must join a team that has a manager.', ['role' => $this->selectedRole->label]) }}
+                        @elseif ($this->selectedRole->isManager())
+                            {{ __('Managers must join an existing team or create a new one.') }}
+                        @else
+                            {{ __('Administrators can see every team, so a team is optional.') }}
+                        @endif
+                    </flux:description>
+
+                    <div class="mt-3 space-y-4">
+                        <flux:select wire:model.live="team" :disabled="filled($newTeam)" data-test="admin-user-team">
+                            <flux:select.option value="">{{ __('No existing team') }}</flux:select.option>
+                            @foreach ($this->teams as $teamOption)
+                                <flux:select.option :value="$teamOption->slug">{{ $teamOption->name }}</flux:select.option>
+                            @endforeach
+                        </flux:select>
+                        <flux:error name="team" />
+
+                        @if ($this->selectedRole->canCreateTeams())
+                            <flux:input wire:model.live.blur="newTeam" :label="__('Or create a new team')" :placeholder="__('New team name')" :disabled="$team !== ''" data-test="admin-user-new-team" />
+                        @endif
+                    </div>
+                </flux:fieldset>
             </div>
-        </flux:fieldset>
+        </x-form-section>
 
-        <div class="flex gap-2">
+        <div class="flex gap-2 border-t border-zinc-200 pt-6 lg:ps-[calc(15rem+3rem)] dark:border-white/9">
             <flux:button variant="primary" type="submit" data-test="admin-user-save">{{ __('Create user') }}</flux:button>
             <flux:button variant="ghost" :href="route('admin.users.index')" wire:navigate>{{ __('Cancel') }}</flux:button>
         </div>

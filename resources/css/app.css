@@ -8,59 +8,358 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * TelcoDash tokens: "Floating island" on deep ink. See DESIGN.md.
+ * Flux's zinc scale is replaced with an ink-tinted scale so every Flux component inherits it.
+ */
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-display: 'Bricolage Grotesque', 'Geist', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
-    --color-zinc-50: #fafafa;
-    --color-zinc-100: #f5f5f5;
-    --color-zinc-200: #e5e5e5;
-    --color-zinc-300: #d4d4d4;
-    --color-zinc-400: #a3a3a3;
-    --color-zinc-500: #737373;
-    --color-zinc-600: #525252;
-    --color-zinc-700: #404040;
-    --color-zinc-800: #262626;
-    --color-zinc-900: #171717;
-    --color-zinc-950: #0a0a0a;
+    --color-zinc-50: oklch(0.985 0.003 275);
+    --color-zinc-100: oklch(0.962 0.008 275);
+    --color-zinc-200: oklch(0.918 0.013 275);
+    --color-zinc-300: oklch(0.858 0.018 275);
+    --color-zinc-400: oklch(0.7 0.026 275);
+    --color-zinc-500: oklch(0.556 0.032 275);
+    --color-zinc-600: oklch(0.45 0.036 275);
+    --color-zinc-700: oklch(0.37 0.04 275);
+    --color-zinc-800: oklch(0.285 0.042 275);
+    --color-zinc-900: oklch(0.225 0.045 275);
+    --color-zinc-950: oklch(0.17 0.038 275);
 
-    --color-accent: var(--color-neutral-800);
-    --color-accent-content: var(--color-neutral-800);
+    /* Ink: the island and other "shell" surfaces, identical in both themes. */
+    --color-ink: oklch(0.215 0.06 275);
+    --color-ink-raised: oklch(0.27 0.065 275);
+
+    /* Electric: primary actions, current selection, focus. */
+    --color-accent: oklch(0.54 0.235 272);
+    --color-accent-content: oklch(0.5 0.23 272);
     --color-accent-foreground: var(--color-white);
+
+    /* Amber: things that need a person's attention. */
+    --color-attention: oklch(0.8 0.155 72);
+    --color-attention-strong: oklch(0.62 0.15 60);
+
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --dur-fast: 140ms;
+    --dur-base: 220ms;
+    --dur-slow: 640ms;
+
+    --shadow-island: 0 1px 0 0 oklch(1 0 0 / 0.06) inset, 0 24px 48px -24px oklch(0.2 0.08 275 / 0.45), 0 4px 12px -4px oklch(0.2 0.08 275 / 0.2);
+    --shadow-overlay: 0 16px 40px -12px oklch(0.2 0.06 275 / 0.28), 0 2px 6px -2px oklch(0.2 0.06 275 / 0.1);
+
+    --animate-rise: rise var(--dur-base) var(--ease-out) both;
+    --animate-signal-bar: signal-bar var(--dur-slow) var(--ease-out) both;
+
+    @keyframes rise {
+        from {
+            opacity: 0;
+            transform: translateY(6px);
+        }
+    }
+
+    @keyframes signal-bar {
+        from {
+            transform: scaleY(0.15);
+            opacity: 0.2;
+        }
+    }
+
+    @keyframes signal-flow {
+        to {
+            stroke-dashoffset: -120;
+        }
+    }
+
+    @keyframes node-ping {
+        0% {
+            transform: scale(1);
+            opacity: 0.55;
+        }
+        80%,
+        100% {
+            transform: scale(2.6);
+            opacity: 0;
+        }
+    }
 }
 
 @layer theme {
     .dark {
-        --color-accent: var(--color-white);
-        --color-accent-content: var(--color-white);
-        --color-accent-foreground: var(--color-neutral-800);
+        --color-accent: oklch(0.74 0.16 275);
+        --color-accent-content: oklch(0.78 0.14 275);
+        --color-accent-foreground: oklch(0.2 0.06 275);
+        --shadow-island: 0 0 0 1px oklch(1 0 0 / 0.07), 0 24px 48px -24px oklch(0 0 0 / 0.7);
+        --shadow-overlay: 0 16px 40px -12px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(1 0 0 / 0.07);
     }
 }
 
 @layer base {
-
     *,
     ::after,
     ::before,
     ::backdrop,
     ::file-selector-button {
-        border-color: var(--color-gray-200, currentColor);
+        border-color: var(--color-zinc-200, currentColor);
+    }
+
+    .dark *,
+    .dark ::after,
+    .dark ::before {
+        border-color: oklch(1 0 0 / 0.09);
+    }
+
+    html {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+        accent-color: var(--color-accent);
+        caret-color: var(--color-accent);
+        scrollbar-color: var(--color-zinc-300) transparent;
+    }
+
+    html.dark {
+        color-scheme: dark;
+        scrollbar-color: var(--color-zinc-700) transparent;
+    }
+
+    body {
+        @apply bg-zinc-100 text-zinc-700 dark:bg-zinc-950 dark:text-zinc-300;
+    }
+
+    ::selection {
+        background: color-mix(in oklab, var(--color-accent) 24%, transparent);
+    }
+
+    :focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 2px;
+    }
+
+    table,
+    [data-flux-table] {
+        font-variant-numeric: tabular-nums;
+    }
+
+    h1,
+    h2,
+    h3,
+    [data-flux-heading] {
+        text-wrap: balance;
     }
 }
 
+@utility font-display {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    letter-spacing: -0.025em;
+}
+
+/* Flux form fields */
 [data-flux-field]:not(ui-radio, ui-checkbox) {
     @apply grid gap-2;
 }
 
 [data-flux-label] {
-    @apply  !mb-0 !leading-tight;
+    @apply !mb-0 !leading-tight;
 }
 
 input:focus[data-flux-control],
 textarea:focus[data-flux-control],
 select:focus[data-flux-control] {
-    @apply outline-hidden ring-2 ring-accent ring-offset-2 ring-offset-accent-foreground;
+    @apply outline-hidden ring-4 ring-accent/15 border-accent;
 }
 
-/* \[:where(&)\]:size-4 {
-    @apply size-4;
-} */
+/* Feedback: buttons press, interactive surfaces ease their colour changes. */
+[data-flux-button],
+[data-flux-sidebar-item],
+[data-flux-navlist-item],
+[data-flux-menu-item],
+[data-flux-table] tr {
+    transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+    transition-duration: var(--dur-fast);
+    transition-timing-function: var(--ease-out);
+}
+
+[data-flux-button]:active:not(:disabled) {
+    transform: scale(0.97);
+}
+
+/* Overlays carry the only drop shadows on the canvas. */
+[data-flux-menu],
+[data-flux-modal] > dialog,
+ui-toast [data-flux-toast-dialog] {
+    box-shadow: var(--shadow-overlay);
+}
+
+/* ---------------------------------------------------------------
+ * The island: a floating deep-ink sidebar.
+ * ------------------------------------------------------------- */
+[data-island] {
+    background: var(--color-ink);
+}
+
+@media (min-width: 64rem) {
+    [data-island] {
+        margin: 0.75rem 0 0.75rem 0.75rem;
+        border-radius: 1.25rem;
+        height: calc(100dvh - 1.5rem);
+        max-height: calc(100dvh - 1.5rem);
+        position: sticky;
+        top: 0.75rem;
+        box-shadow: var(--shadow-island);
+    }
+}
+
+[data-island] [data-flux-sidebar-item] {
+    color: oklch(1 0 0 / 0.66);
+}
+
+[data-island] [data-flux-sidebar-item]:hover {
+    color: white;
+    background: oklch(1 0 0 / 0.07);
+}
+
+[data-island] [data-flux-sidebar-item][data-current] {
+    color: white;
+    background: linear-gradient(90deg, oklch(0.6 0.2 275 / 0.32), oklch(0.6 0.2 275 / 0.08));
+    border-color: oklch(0.75 0.15 275 / 0.25);
+}
+
+[data-island] [data-flux-sidebar-item][data-current] svg {
+    color: oklch(0.82 0.12 275);
+}
+
+/* Current item: a lit node on the leading edge. */
+[data-island] [data-flux-sidebar-item][data-current]::after {
+    content: '';
+    position: absolute;
+    inset-inline-end: 0.75rem;
+    top: 50%;
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: oklch(0.82 0.12 275);
+    box-shadow: 0 0 0 3px oklch(0.75 0.15 275 / 0.2);
+    transform: translateY(-50%);
+}
+
+[data-flux-sidebar-collapsed-desktop] [data-island] [data-flux-sidebar-item][data-current]::after {
+    display: none;
+}
+
+[data-island] [data-flux-sidebar-group] > div:first-child,
+[data-island] [data-flux-sidebar-group-heading] {
+    color: oklch(1 0 0 / 0.4);
+}
+
+/* Navigation progress line (wire:navigate). */
+#nprogress .bar {
+    background: linear-gradient(90deg, var(--color-accent), var(--color-attention)) !important;
+    height: 2px !important;
+}
+
+#nprogress .peg {
+    box-shadow: none !important;
+}
+
+/* ---------------------------------------------------------------
+ * Motion
+ * ------------------------------------------------------------- */
+
+/* Sections settle in, in order, on load and after each wire:navigate. */
+[data-rise] > * {
+    animation: var(--animate-rise);
+}
+
+[data-rise] > *:nth-child(2) {
+    animation-delay: 50ms;
+}
+
+[data-rise] > *:nth-child(3) {
+    animation-delay: 100ms;
+}
+
+[data-rise] > *:nth-child(4) {
+    animation-delay: 150ms;
+}
+
+[data-rise] > *:nth-child(n + 5) {
+    animation-delay: 200ms;
+}
+
+/* Signature: the signal mark builds bar by bar once, on first load only (see partials/head). */
+.signal-intro .signal-bar {
+    transform-box: fill-box;
+    transform-origin: bottom;
+    animation: var(--animate-signal-bar);
+}
+
+.signal-intro .signal-bar:nth-child(2) {
+    animation-delay: 70ms;
+}
+
+.signal-intro .signal-bar:nth-child(3) {
+    animation-delay: 140ms;
+}
+
+.signal-intro .signal-bar:nth-child(4) {
+    animation-delay: 210ms;
+}
+
+/* Network artwork: signal travelling along the lines, nodes pinging. */
+.network-flow {
+    stroke-dasharray: 10 110;
+    animation: signal-flow 3.2s linear infinite;
+}
+
+.network-ping {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: node-ping 2.8s var(--ease-out) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+        animation-duration: 1ms !important;
+        animation-delay: 0ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+    }
+
+    .network-flow,
+    .network-ping {
+        animation: none !important;
+    }
+
+    [data-flux-button]:active:not(:disabled) {
+        transform: none;
+    }
+}
+
+/* Wordmark */
+[data-flux-sidebar-brand] > div:last-child,
+[data-flux-brand] > div:last-child {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: -0.02em;
+}
+
+/* Brand tile: the signal mark on an electric gradient, the same in every context. */
+.logo-tile {
+    background: linear-gradient(140deg, oklch(0.64 0.2 268), oklch(0.5 0.25 285));
+    color: white;
+    box-shadow: 0 1px 0 0 oklch(1 0 0 / 0.25) inset, 0 4px 12px -4px oklch(0.5 0.25 280 / 0.6);
+}
+
+/* Flux headings speak in the display face, like page and section titles. */
+[data-flux-heading] {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
