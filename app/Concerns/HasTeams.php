@@ -99,6 +99,24 @@ trait HasTeams
     }
 
     /**
+     * Make sure the user's current team still exists and is accessible, falling back otherwise.
+     *
+     * Unlike {@see switchTeam()}, this doesn't touch URL defaults, so it is safe to call on
+     * users other than the one making the request.
+     */
+    public function refreshCurrentTeam(): void
+    {
+        $this->unsetRelation('currentTeam');
+
+        if ($this->currentTeam && $this->canAccessTeam($this->currentTeam)) {
+            return;
+        }
+
+        $this->update(['current_team_id' => $this->fallbackTeam()?->id]);
+        $this->unsetRelation('currentTeam');
+    }
+
+    /**
      * Determine if the user belongs to the given team.
      */
     public function belongsToTeam(Team $team): bool

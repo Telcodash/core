@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Users\DeleteUser;
 use App\Concerns\PasswordValidationRules;
 use App\Livewire\Actions\Logout;
 use Illuminate\Support\Facades\Auth;
@@ -13,19 +14,24 @@ new class extends Component {
     /**
      * Delete the currently authenticated user.
      */
-    public function deleteUser(Logout $logout): void
+    public function deleteUser(Logout $logout, DeleteUser $deleteUser): void
     {
         $this->validate([
             'password' => $this->currentPasswordRules(),
         ]);
 
-        if (Auth::user()->isRequiredManager()) {
+        $user = Auth::user();
+
+        if ($user->isRequiredManager()) {
             $this->addError('password', __('You are the only manager of a team with advisors. Another manager must be assigned before you can delete your account.'));
 
             return;
         }
 
-        tap(Auth::user(), $logout(...))->delete();
+        // Log out first: logging out saves the user's remember token, which would re-insert a deleted user.
+        $logout();
+
+        $deleteUser->handle($user);
 
         $this->redirect('/', navigate: true);
     }

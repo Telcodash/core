@@ -1,12 +1,11 @@
 <?php
 
+use App\Actions\Teams\DeleteTeam;
 use App\Data\UserTeam;
 use App\Models\Team;
-use App\Models\User;
 use Flux\Flux;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -27,7 +26,7 @@ new class extends Component {
         return __('Type ":name" to confirm', ['name' => $this->team->name]);
     }
 
-    public function deleteTeam(): void
+    public function deleteTeam(DeleteTeam $deleteTeam): void
     {
         Gate::authorize('delete', $this->team);
 
@@ -41,26 +40,7 @@ new class extends Component {
             return;
         }
 
-        $user = Auth::user();
-
-        $fallbackTeam = $user->isCurrentTeam($this->team)
-            ? $user->fallbackTeam($this->team)
-            : null;
-
-        DB::transaction(function () use ($user) {
-            $this->team->memberships()->delete();
-            $this->team->delete();
-
-            User::where('current_team_id', $this->team->id)
-                ->where('id', '!=', $user->id)
-                ->each(fn (User $affectedUser) => $affectedUser->switchToFallbackTeam($this->team));
-        });
-
-        if ($fallbackTeam) {
-            $user->switchTeam($fallbackTeam);
-        } elseif ($user->isCurrentTeam($this->team)) {
-            $user->switchToFallbackTeam($this->team);
-        }
+        $deleteTeam->handle($this->team);
 
         Flux::toast(variant: 'success', text: __('Team deleted.'));
 

@@ -79,7 +79,7 @@ class Team extends Model
      */
     public function advisors(): BelongsToMany
     {
-        return $this->members()->withRole(Role::ADVISOR, Role::ADVISOR_PLUS);
+        return $this->members()->withRole(...Role::ADVISOR_TIER);
     }
 
     /**
@@ -144,6 +144,19 @@ class Team extends Model
             ->get()
             ->reject(fn (User $advisor) => $advisor->hasManagedTeam(excluding: $this))
             ->values();
+    }
+
+    /**
+     * Get the advisor-tier users who belong to any of the given teams.
+     *
+     * @param  iterable<int>  $teamIds
+     * @return Collection<int, User>
+     */
+    public static function advisorsOf(iterable $teamIds): Collection
+    {
+        return User::withRole(...Role::ADVISOR_TIER)
+            ->whereHas('teams', fn (Builder $query) => $query->whereKey(collect($teamIds)->all()))
+            ->get();
     }
 
     /**

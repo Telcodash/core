@@ -43,6 +43,17 @@ class Role extends Model
     ];
 
     /**
+     * Advisor-tier roles: these must always belong to a team with a manager, and are the
+     * roles managers can manage.
+     *
+     * @var list<string>
+     */
+    public const array ADVISOR_TIER = [
+        self::ADVISOR,
+        self::ADVISOR_PLUS,
+    ];
+
+    /**
      * Find a role by its name.
      */
     public static function named(string $name): self
@@ -129,7 +140,7 @@ class Role extends Model
      */
     public function requiresTeamManager(): bool
     {
-        return $this->isAny(self::ADVISOR, self::ADVISOR_PLUS);
+        return $this->isAny(...self::ADVISOR_TIER);
     }
 
     /**
@@ -167,8 +178,21 @@ class Role extends Model
 
         return match ($this->name) {
             self::ADMINISTRATOR => true,
-            self::MANAGER => in_array($name, [self::ADVISOR, self::ADVISOR_PLUS], true),
+            self::MANAGER => in_array($name, self::ADVISOR_TIER, true),
             default => false,
+        };
+    }
+
+    /**
+     * The Flux badge colour used when displaying this role.
+     */
+    public function badgeColor(): string
+    {
+        return match ($this->name) {
+            self::ADMINISTRATOR => 'amber',
+            self::MANAGER => 'indigo',
+            self::ADVISOR_PLUS => 'sky',
+            default => 'zinc',
         };
     }
 
