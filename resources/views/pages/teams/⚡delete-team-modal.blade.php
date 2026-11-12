@@ -48,17 +48,18 @@ new class extends Component {
             : null;
 
         DB::transaction(function () use ($user) {
-            User::where('current_team_id', $this->team->id)
-                ->where('id', '!=', $user->id)
-                ->each(fn (User $affectedUser) => $affectedUser->switchTeam($affectedUser->personalTeam()));
-
-            $this->team->invitations()->delete();
             $this->team->memberships()->delete();
             $this->team->delete();
+
+            User::where('current_team_id', $this->team->id)
+                ->where('id', '!=', $user->id)
+                ->each(fn (User $affectedUser) => $affectedUser->switchToFallbackTeam($this->team));
         });
 
         if ($fallbackTeam) {
             $user->switchTeam($fallbackTeam);
+        } elseif ($user->isCurrentTeam($this->team)) {
+            $user->switchToFallbackTeam($this->team);
         }
 
         Flux::toast(variant: 'success', text: __('Team deleted.'));

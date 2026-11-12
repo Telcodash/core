@@ -35,7 +35,6 @@ class ProfileUpdateTest extends TestCase
 
         $this->assertEquals('Test User', $user->name);
         $this->assertEquals('test@example.com', $user->email);
-        $this->assertNull($user->email_verified_at);
     }
 
     public function test_email_is_stored_in_lowercase_so_the_user_can_still_log_in(): void
@@ -73,22 +72,6 @@ class ProfileUpdateTest extends TestCase
             ->set('email', 'Taken@Example.com')
             ->call('updateProfileInformation')
             ->assertHasErrors(['email']);
-    }
-
-    public function test_email_verification_status_is_unchanged_when_email_address_is_unchanged(): void
-    {
-        $user = User::factory()->create();
-
-        $this->actingAs($user);
-
-        $response = Livewire::test('pages::settings.profile')
-            ->set('name', 'Test User')
-            ->set('email', $user->email)
-            ->call('updateProfileInformation');
-
-        $response->assertHasNoErrors();
-
-        $this->assertNotNull($user->refresh()->email_verified_at);
     }
 
     public function test_user_can_delete_their_account(): void

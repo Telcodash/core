@@ -4,46 +4,32 @@ namespace App\Concerns;
 
 use App\Data\TeamPermissions;
 use App\Data\UserTeam;
-use App\Enums\TeamPermission;
-use App\Enums\TeamRole;
 use App\Models\Membership;
 use App\Models\Team;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 
+/**
+ * @mixin User
+ */
 trait HasTeams
 {
     /**
      * Get all of the teams the user belongs to.
      *
-     * @return BelongsToMany<Team, $this>
+     * @return BelongsToMany<Team, $this, Membership, 'pivot'>
      */
     public function teams(): BelongsToMany
     {
         return $this->belongsToMany(Team::class, 'team_members', 'user_id', 'team_id')
-            ->withPivot(['role'])
+            ->using(Membership::class)
             ->withTimestamps();
-    }
-
-    /**
-     * Get all of the teams the user owns.
-     *
-     * @return HasManyThrough<Team, Membership, $this>
-     */
-    public function ownedTeams(): HasManyThrough
-    {
-        return $this->hasManyThrough(
-            Team::class,
-            Membership::class,
-            'user_id',
-            'id',
-            'id',
-            'team_id',
-        )->where('team_members.role', TeamRole::Owner->value);
     }
 
     /**
@@ -67,13 +53,15 @@ trait HasTeams
     }
 
     /**
-     * Get the user's personal team.
+     * Get a query for every team this user is allowed to see.
+     *
+     * Administrators can see all teams; everyone else only sees teams they belong to.
+     *
+     * @return Builder<Team>
      */
-    public function personalTeam(): ?Team
+    public function visibleTeams(): Builder
     {
-        return $this->ownedTeams()
-            ->where('teams.is_personal', true)
-            ->first();
+        return Team::query()->visibleTo($this);
     }
 
     /**
@@ -81,7 +69,7 @@ trait HasTeams
      */
     public function switchTeam(Team $team): bool
     {
-        if (! $this->belongsToTeam($team)) {
+        if (! $this->canAccessTeam($team)) {
             return false;
         }
 
@@ -94,11 +82,70 @@ trait HasTeams
     }
 
     /**
+     * Switch to the user's fallback team, or clear the current team if none is available.
+     */
+    public function switchToFallbackTeam(?Team $excluding = null): void
+    {
+        $team = $this->fallbackTeam($excluding);
+
+        if ($team) {
+            $this->switchTeam($team);
+
+            return;
+        }
+
+        $this->update(['current_team_id' => null]);
+        $this->setRelation('currentTeam', null);
+    }
+
+    /**
      * Determine if the user belongs to the given team.
      */
     public function belongsToTeam(Team $team): bool
     {
         return $this->teams()->where('teams.id', $team->id)->exists();
+    }
+
+    /**
+     * Determine if the user may access the given team (as a member or an administrator).
+     */
+    public function canAccessTeam(Team $team): bool
+    {
+        return $this->role->canViewAllTeams() || $this->belongsToTeam($team);
+    }
+
+    /**
+     * Determine if the user manages the given team.
+     *
+     * Administrators manage every team; managers manage the teams they belong to.
+     */
+    public function managesTeam(Team $team): bool
+    {
+        if ($this->isAdministrator()) {
+            return true;
+        }
+
+        return $this->isManager() && $this->belongsToTeam($team);
+    }
+
+    /**
+     * Determine if the user belongs to a team that has a manager, optionally ignoring one team.
+     */
+    public function hasManagedTeam(?Team $excluding = null): bool
+    {
+        return $this->teams()
+            ->when($excluding, fn ($query) => $query->where('teams.id', '!=', $excluding->id))
+            ->withManager()
+            ->exists();
+    }
+
+    /**
+     * Determine if removing this user entirely would leave advisors without a managed team.
+     */
+    public function isRequiredManager(): bool
+    {
+        return $this->isManager()
+            && $this->teams->contains(fn (Team $team) => ! $team->canDetach($this));
     }
 
     /**
@@ -110,32 +157,14 @@ trait HasTeams
     }
 
     /**
-     * Determine if the user is the owner of the given team.
-     */
-    public function ownsTeam(Team $team): bool
-    {
-        return $this->teamRole($team) === TeamRole::Owner;
-    }
-
-    /**
-     * Get the user's role on the given team.
-     */
-    public function teamRole(Team $team): ?TeamRole
-    {
-        return $this->teamMemberships()
-            ->where('team_id', $team->id)
-            ->first()
-            ?->role;
-    }
-
-    /**
-     * Get the user's teams as a collection of UserTeam objects.
+     * Get the teams visible to the user as a collection of UserTeam objects.
      *
      * @return Collection<int, UserTeam>
      */
     public function toUserTeams(bool $includeCurrent = false): Collection
     {
-        return $this->teams()
+        return $this->visibleTeams()
+            ->orderByRaw('LOWER(teams.name)')
             ->get()
             ->map(fn (Team $team) => ! $includeCurrent && $this->isCurrentTeam($team) ? null : $this->toUserTeam($team))
             ->filter()
@@ -147,15 +176,15 @@ trait HasTeams
      */
     public function toUserTeam(Team $team): UserTeam
     {
-        $role = $this->teamRole($team);
+        $gate = Gate::forUser($this);
 
         return new UserTeam(
             id: $team->id,
             name: $team->name,
             slug: $team->slug,
-            isPersonal: $team->is_personal,
-            role: $role?->value,
-            roleLabel: $role?->label(),
+            isMember: $this->belongsToTeam($team),
+            canManage: $gate->allows('update', $team),
+            canLeave: $gate->allows('leave', $team),
             isCurrent: $this->isCurrentTeam($team),
         );
     }
@@ -165,32 +194,26 @@ trait HasTeams
      */
     public function toTeamPermissions(Team $team): TeamPermissions
     {
-        $role = $this->teamRole($team);
+        $gate = Gate::forUser($this);
 
         return new TeamPermissions(
-            canUpdateTeam: $role?->hasPermission(TeamPermission::UpdateTeam) ?? false,
-            canDeleteTeam: $role?->hasPermission(TeamPermission::DeleteTeam) ?? false,
-            canAddMember: $role?->hasPermission(TeamPermission::AddMember) ?? false,
-            canUpdateMember: $role?->hasPermission(TeamPermission::UpdateMember) ?? false,
-            canRemoveMember: $role?->hasPermission(TeamPermission::RemoveMember) ?? false,
-            canCreateInvitation: $role?->hasPermission(TeamPermission::CreateInvitation) ?? false,
-            canCancelInvitation: $role?->hasPermission(TeamPermission::CancelInvitation) ?? false,
+            canUpdateTeam: $gate->allows('update', $team),
+            canDeleteTeam: $gate->allows('delete', $team),
+            canManageMembers: $this->managesTeam($team),
         );
     }
 
+    /**
+     * Get the team the user should fall back to when their current team is unavailable.
+     */
     public function fallbackTeam(?Team $excluding = null): ?Team
     {
-        return $this->teams()
+        $first = fn ($query) => $query
             ->when($excluding, fn ($query) => $query->where('teams.id', '!=', $excluding->id))
             ->orderByRaw('LOWER(teams.name)')
             ->first();
-    }
 
-    /**
-     * Determine if the user has the given permission on the team.
-     */
-    public function hasTeamPermission(Team $team, TeamPermission $permission): bool
-    {
-        return $this->teamRole($team)?->hasPermission($permission) ?? false;
+        // Prefer teams the user belongs to, then any other team they can see (administrators).
+        return $first($this->teams()) ?? $first($this->visibleTeams());
     }
 }

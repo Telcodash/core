@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Enums\TeamRole;
+use App\Models\Role;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -29,46 +29,74 @@ class UserFactory extends Factory
         return [
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
-            'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
+            'role_id' => fn () => Role::named(Role::ADVISOR)->id,
             'remember_token' => Str::random(10),
-            /* @chisel-2fa */
             'two_factor_secret' => null,
             'two_factor_recovery_codes' => null,
             'two_factor_confirmed_at' => null,
-            /* @end-chisel-2fa */
         ];
     }
 
     /**
      * Configure the model factory.
+     *
+     * Every user is placed on a team: the team given via {@see forTeam()} or,
+     * by default, a new team of their own.
      */
     public function configure(): static
     {
-        return $this->afterCreating(function ($user) {
-            $team = Team::factory()->personal()->create([
-                'name' => $user->name."'s Team",
-            ]);
+        return $this->afterCreating(function (User $user) {
+            $team = $user->current_team_id
+                ? Team::findOrFail($user->current_team_id)
+                : Team::factory()->create(['name' => $user->name."'s Team"]);
 
-            $team->members()->attach($user, [
-                'role' => TeamRole::Owner->value,
-            ]);
+            $team->members()->syncWithoutDetaching([$user->id]);
 
             $user->switchTeam($team);
         });
     }
 
     /**
-     * Indicate that the model's email address should be unverified.
+     * Place the user on the given team instead of a new one.
      */
-    public function unverified(): static
+    public function forTeam(Team $team): static
     {
         return $this->state(fn (array $attributes) => [
-            'email_verified_at' => null,
+            'current_team_id' => $team->id,
         ]);
     }
 
-    /* @chisel-2fa */
+    /**
+     * Give the user the given role.
+     */
+    public function withRole(string $role): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role_id' => Role::named($role)->id,
+        ]);
+    }
+
+    public function advisor(): static
+    {
+        return $this->withRole(Role::ADVISOR);
+    }
+
+    public function advisorPlus(): static
+    {
+        return $this->withRole(Role::ADVISOR_PLUS);
+    }
+
+    public function manager(): static
+    {
+        return $this->withRole(Role::MANAGER);
+    }
+
+    public function administrator(): static
+    {
+        return $this->withRole(Role::ADMINISTRATOR);
+    }
+
     /**
      * Indicate that the model has two-factor authentication configured.
      */
@@ -80,5 +108,4 @@ class UserFactory extends Factory
             'two_factor_confirmed_at' => now(),
         ]);
     }
-    /* @end-chisel-2fa */
 }

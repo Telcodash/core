@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Teams;
 
-use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -13,102 +12,141 @@ class TeamMemberTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_team_member_role_can_be_updated_by_owner(): void
+    /**
+     * Create a team with a manager and an advisor who also belongs to a second managed team,
+     * so the advisor can be removed from the first team without being stranded.
+     *
+     * @return array{Team, User, User, Team}
+     */
+    private function teamWithRemovableAdvisor(string $advisorState = 'advisor'): array
     {
-        $owner = User::factory()->create();
-        $member = User::factory()->create();
         $team = Team::factory()->create();
+        $otherTeam = Team::factory()->create();
 
-        $team->members()->attach($owner, ['role' => TeamRole::Owner->value]);
-        $team->members()->attach($member, ['role' => TeamRole::Member->value]);
+        $manager = User::factory()->manager()->forTeam($team)->create();
+        User::factory()->manager()->forTeam($otherTeam)->create();
 
-        $this->actingAs($owner);
+        $advisor = User::factory()->{$advisorState}()->forTeam($team)->create();
+        $otherTeam->members()->attach($advisor);
+
+        return [$team, $manager, $advisor, $otherTeam];
+    }
+
+    public function test_members_are_listed_with_their_role(): void
+    {
+        [$team, $manager] = $this->teamWithRemovableAdvisor('advisorPlus');
+
+        $this->actingAs($manager);
 
         Livewire::test('pages::teams.edit', ['team' => $team])
-            ->call('updateMember', $member->id, TeamRole::Admin->value)
-            ->assertHasNoErrors();
-
-        $this->assertEquals(
-            TeamRole::Admin->value,
-            $team->members()->where('user_id', $member->id)->first()->pivot->role->value,
-        );
+            ->assertSee('Manager')
+            ->assertSee('Advisor Plus');
     }
 
-    public function test_team_member_role_cannot_be_updated_by_non_owner(): void
+    public function test_managers_can_remove_advisors_from_their_team(): void
     {
-        $owner = User::factory()->create();
-        $admin = User::factory()->create();
-        $member = User::factory()->create();
-        $team = Team::factory()->create();
+        foreach (['advisor', 'advisorPlus'] as $state) {
+            [$team, $manager, $advisor, $otherTeam] = $this->teamWithRemovableAdvisor($state);
 
-        $team->members()->attach($owner, ['role' => TeamRole::Owner->value]);
-        $team->members()->attach($admin, ['role' => TeamRole::Admin->value]);
-        $team->members()->attach($member, ['role' => TeamRole::Member->value]);
+            $this->actingAs($manager);
 
-        $this->actingAs($admin);
+            Livewire::test('pages::teams.remove-member-modal', ['team' => $team])
+                ->set('memberId', $advisor->id)
+                ->call('removeMember')
+                ->assertHasNoErrors();
 
-        Livewire::test('pages::teams.edit', ['team' => $team])
-            ->call('updateMember', $member->id, TeamRole::Admin->value)
-            ->assertForbidden();
+            $this->assertFalse($advisor->fresh()->belongsToTeam($team));
+            $this->assertEquals($otherTeam->id, $advisor->fresh()->current_team_id);
+        }
     }
 
-    public function test_team_member_can_be_removed_by_owner(): void
+    public function test_managers_cannot_remove_other_managers(): void
     {
-        $owner = User::factory()->create();
-        $member = User::factory()->create();
         $team = Team::factory()->create();
+        $manager = User::factory()->manager()->forTeam($team)->create();
+        $otherManager = User::factory()->manager()->forTeam($team)->create();
 
-        $team->members()->attach($owner, ['role' => TeamRole::Owner->value]);
-        $team->members()->attach($member, ['role' => TeamRole::Member->value]);
-
-        $this->actingAs($owner);
+        $this->actingAs($manager);
 
         Livewire::test('pages::teams.remove-member-modal', ['team' => $team])
-            ->set('memberId', $member->id)
-            ->call('removeMember')
-            ->assertHasNoErrors();
-
-        $this->assertFalse($member->fresh()->belongsToTeam($team));
-    }
-
-    public function test_team_member_cannot_be_removed_by_non_owners(): void
-    {
-        $owner = User::factory()->create();
-        $admin = User::factory()->create();
-        $member = User::factory()->create();
-        $team = Team::factory()->create();
-
-        $team->members()->attach($owner, ['role' => TeamRole::Owner->value]);
-        $team->members()->attach($admin, ['role' => TeamRole::Admin->value]);
-        $team->members()->attach($member, ['role' => TeamRole::Member->value]);
-
-        $this->actingAs($admin);
-
-        Livewire::test('pages::teams.remove-member-modal', ['team' => $team])
-            ->set('memberId', $member->id)
+            ->set('memberId', $otherManager->id)
             ->call('removeMember')
             ->assertForbidden();
     }
 
-    public function test_removed_members_current_team_is_set_to_personal_team(): void
+    public function test_managers_cannot_remove_members_of_teams_they_do_not_manage(): void
     {
-        $owner = User::factory()->create();
-        $member = User::factory()->create();
-        $personalTeam = $member->personalTeam();
-        $team = Team::factory()->create();
+        [$team, , $advisor] = $this->teamWithRemovableAdvisor();
+        $outsideManager = User::factory()->manager()->create();
 
-        $team->members()->attach($owner, ['role' => TeamRole::Owner->value]);
-        $team->members()->attach($member, ['role' => TeamRole::Member->value]);
-
-        $member->update(['current_team_id' => $team->id]);
-
-        $this->actingAs($owner);
+        $this->actingAs($outsideManager);
 
         Livewire::test('pages::teams.remove-member-modal', ['team' => $team])
-            ->set('memberId', $member->id)
+            ->set('memberId', $advisor->id)
+            ->call('removeMember')
+            ->assertForbidden();
+    }
+
+    public function test_advisors_cannot_remove_members(): void
+    {
+        [$team, , $advisor] = $this->teamWithRemovableAdvisor();
+        $otherAdvisor = User::factory()->advisorPlus()->forTeam($team)->create();
+
+        $this->actingAs($otherAdvisor);
+
+        Livewire::test('pages::teams.remove-member-modal', ['team' => $team])
+            ->set('memberId', $advisor->id)
+            ->call('removeMember')
+            ->assertForbidden();
+    }
+
+    public function test_advisors_cannot_be_removed_from_their_only_managed_team(): void
+    {
+        $team = Team::factory()->create();
+        $manager = User::factory()->manager()->forTeam($team)->create();
+        $advisor = User::factory()->advisor()->forTeam($team)->create();
+
+        $this->actingAs($manager);
+
+        Livewire::test('pages::teams.edit', ['team' => $team])
+            ->assertDontSeeHtml('data-test="member-remove-button"');
+
+        Livewire::test('pages::teams.remove-member-modal', ['team' => $team])
+            ->set('memberId', $advisor->id)
+            ->call('removeMember')
+            ->assertForbidden();
+
+        $this->assertTrue($advisor->fresh()->belongsToTeam($team));
+    }
+
+    public function test_administrators_can_remove_managers_when_another_manager_remains(): void
+    {
+        $team = Team::factory()->create();
+        $manager = User::factory()->manager()->forTeam($team)->create();
+        User::factory()->manager()->forTeam($team)->create();
+        User::factory()->advisor()->forTeam($team)->create();
+
+        $this->actingAs(User::factory()->administrator()->create());
+
+        Livewire::test('pages::teams.remove-member-modal', ['team' => $team])
+            ->set('memberId', $manager->id)
             ->call('removeMember')
             ->assertHasNoErrors();
 
-        $this->assertEquals($personalTeam->id, $member->fresh()->current_team_id);
+        $this->assertFalse($manager->fresh()->belongsToTeam($team));
+    }
+
+    public function test_administrators_cannot_remove_the_last_manager_of_a_team_with_advisors(): void
+    {
+        $team = Team::factory()->create();
+        $manager = User::factory()->manager()->forTeam($team)->create();
+        User::factory()->advisor()->forTeam($team)->create();
+
+        $this->actingAs(User::factory()->administrator()->create());
+
+        Livewire::test('pages::teams.remove-member-modal', ['team' => $team])
+            ->set('memberId', $manager->id)
+            ->call('removeMember')
+            ->assertForbidden();
     }
 }

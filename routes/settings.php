@@ -9,15 +9,13 @@ Route::middleware(['auth'])->group(function () {
     Route::livewire('settings/profile', 'pages::settings.profile')->name('profile.edit');
 });
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth'])->group(function () {
     Route::livewire('settings/appearance', 'pages::settings.appearance')->name('appearance.edit');
 
     Route::livewire('settings/security', 'pages::settings.security')
-        /* @chisel-password-confirmation */
         ->middleware([
             'password.confirm',
         ])
-        /* @end-chisel-password-confirmation */
         ->name('security.edit');
 
     Route::livewire('settings/teams', 'pages::teams.index')->name('teams.index');
@@ -27,11 +25,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 });
 
-/* @chisel-passkeys */
 Route::get('.well-known/passkey-endpoints', function () {
     return response()->json([
         'enroll' => route('security.edit'),
         'manage' => route('security.edit'),
     ]);
 })->name('well-known.passkeys');
-/* @end-chisel-passkeys */

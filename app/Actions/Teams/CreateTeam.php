@@ -2,28 +2,28 @@
 
 namespace App\Actions\Teams;
 
-use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 class CreateTeam
 {
     /**
-     * Create a new team and add the user as owner.
+     * Create a new team with the given user as its first member.
+     *
+     * Only roles that may create teams (managers and administrators) are allowed.
      */
-    public function handle(User $user, string $name, bool $isPersonal = false): Team
+    public function handle(User $user, string $name): Team
     {
-        return DB::transaction(function () use ($user, $name, $isPersonal) {
-            $team = Team::create([
-                'name' => $name,
-                'is_personal' => $isPersonal,
-            ]);
+        if (! $user->role->canCreateTeams()) {
+            throw new InvalidArgumentException("Users with the [{$user->role->name}] role cannot create teams.");
+        }
 
-            $membership = $team->memberships()->create([
-                'user_id' => $user->id,
-                'role' => TeamRole::Owner,
-            ]);
+        return DB::transaction(function () use ($user, $name) {
+            $team = Team::create(['name' => $name]);
+
+            $team->members()->attach($user);
 
             $user->switchTeam($team);
 

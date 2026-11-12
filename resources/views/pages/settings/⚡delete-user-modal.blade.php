@@ -19,6 +19,12 @@ new class extends Component {
             'password' => $this->currentPasswordRules(),
         ]);
 
+        if (Auth::user()->isRequiredManager()) {
+            $this->addError('password', __('You are the only manager of a team with advisors. Another manager must be assigned before you can delete your account.'));
+
+            return;
+        }
+
         tap(Auth::user(), $logout(...))->delete();
 
         $this->redirect('/', navigate: true);

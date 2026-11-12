@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Enums\TeamRole;
+use App\Models\Role;
 use App\Models\Team;
 use App\Models\User;
 use Closure;
@@ -12,7 +12,8 @@ use Symfony\Component\HttpFoundation\Response;
 class EnsureTeamMembership
 {
     /**
-     * Handle an incoming request.
+     * Ensure the user can access the team in the route, optionally requiring a minimum role
+     * (e.g. `EnsureTeamMembership::class.':manager'`). Administrators can access every team.
      *
      * @param  Closure(Request): (Response)  $next
      */
@@ -20,9 +21,9 @@ class EnsureTeamMembership
     {
         [$user, $team] = [$request->user(), $this->team($request)];
 
-        abort_if(! $user || ! $team || ! $user->belongsToTeam($team), 403);
+        abort_if(! $user || ! $team || ! $user->canAccessTeam($team), 403);
 
-        $this->ensureTeamMemberHasRequiredRole($user, $team, $minimumRole);
+        $this->ensureUserHasRequiredRole($user, $minimumRole);
 
         if ($request->route('current_team') && ! $user->isCurrentTeam($team)) {
             $user->switchTeam($team);
@@ -34,22 +35,13 @@ class EnsureTeamMembership
     /**
      * Ensure the given user has at least the given role, if applicable.
      */
-    protected function ensureTeamMemberHasRequiredRole(User $user, Team $team, ?string $minimumRole): void
+    protected function ensureUserHasRequiredRole(User $user, ?string $minimumRole): void
     {
         if ($minimumRole === null) {
             return;
         }
 
-        $role = $user->teamRole($team);
-
-        $requiredRole = TeamRole::tryFrom($minimumRole);
-
-        abort_if(
-            $requiredRole === null ||
-            $role === null ||
-            ! $role->isAtLeast($requiredRole),
-            403,
-        );
+        abort_unless(in_array($minimumRole, Role::NAMES, true) && $user->hasRoleAtLeast($minimumRole), 403);
     }
 
     /**

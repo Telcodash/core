@@ -41,16 +41,12 @@ new #[Title('Teams')] class extends Component {
 
         Gate::authorize('leave', $team);
 
-        $fallbackTeam = $user->isCurrentTeam($team)
-            ? $user->fallbackTeam($team)
-            : null;
-
         $team->memberships()
             ->where('user_id', $user->id)
             ->delete();
 
-        if ($fallbackTeam) {
-            $user->switchTeam($fallbackTeam);
+        if ($user->isCurrentTeam($team)) {
+            $user->switchToFallbackTeam($team);
         }
 
         $this->dispatch('close-modal', name: "leave-team-{$teamId}");
@@ -77,11 +73,13 @@ new #[Title('Teams')] class extends Component {
 
     <x-pages::settings.layout :heading="__('Teams')" :subheading="__('Manage your teams and team memberships')">
         <div class="flex items-center justify-end">
-            <flux:modal.trigger name="create-team">
-                <flux:button variant="primary" icon="plus" x-data="" x-on:click.prevent="$dispatch('open-modal', 'create-team')" data-test="teams-new-team-button">
-                    {{ __('New team') }}
-                </flux:button>
-            </flux:modal.trigger>
+            @can('create', App\Models\Team::class)
+                <flux:modal.trigger name="create-team">
+                    <flux:button variant="primary" icon="plus" x-data="" x-on:click.prevent="$dispatch('open-modal', 'create-team')" data-test="teams-new-team-button">
+                        {{ __('New team') }}
+                    </flux:button>
+                </flux:modal.trigger>
+            @endcan
         </div>
 
         <div class="mt-6 space-y-3">
@@ -91,16 +89,18 @@ new #[Title('Teams')] class extends Component {
                         <div>
                             <div class="flex items-center gap-2">
                                 <span class="font-medium">{{ $team->name }}</span>
-                                @if ($team->isPersonal)
-                                    <flux:badge color="zinc">{{ __('Personal') }}</flux:badge>
+                                @if ($team->isCurrent)
+                                    <flux:badge color="zinc">{{ __('Current') }}</flux:badge>
                                 @endif
                             </div>
-                            <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">{{ $team->roleLabel }}</flux:text>
+                            @unless ($team->isMember)
+                                <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Not a member') }}</flux:text>
+                            @endunless
                         </div>
                     </div>
 
                     <div class="flex items-center gap-1">
-                        @if (! $team->isPersonal && $team->role !== 'owner')
+                        @if ($team->canLeave)
                             <flux:modal.trigger :name="'leave-team-'.$team->id">
                                 <flux:tooltip :content="__('Leave team')">
                                     <flux:button
@@ -115,20 +115,20 @@ new #[Title('Teams')] class extends Component {
                             </flux:modal.trigger>
                         @endif
 
-                        <flux:tooltip :content="$team->role === 'member' ? __('View team') : __('Edit team')">
+                        <flux:tooltip :content="$team->canManage ? __('Edit team') : __('View team')">
                             <flux:button
                                 variant="ghost"
                                 size="sm"
-                                :icon="$team->role === 'member' ? 'eye' : 'pencil'"
+                                :icon="$team->canManage ? 'pencil' : 'eye'"
                                 :href="route('teams.edit', $team->slug)"
                                 wire:navigate
-                                :data-test="$team->role === 'member' ? 'team-view-button' : 'team-edit-button'"
+                                :data-test="$team->canManage ? 'team-edit-button' : 'team-view-button'"
                             />
                         </flux:tooltip>
                     </div>
                 </div>
 
-                @if (! $team->isPersonal && $team->role !== 'owner')
+                @if ($team->canLeave)
                     <flux:modal :name="'leave-team-'.$team->id" focusable class="max-w-lg">
                         <form wire:submit="leaveTeam({{ $team->id }})" class="space-y-6">
                             <div>
@@ -158,6 +158,7 @@ new #[Title('Teams')] class extends Component {
         </div>
     </x-pages::settings.layout>
 
+    @can('create', App\Models\Team::class)
     <flux:modal name="create-team" :show="$errors->isNotEmpty()" focusable class="max-w-lg">
         <form wire:submit="createTeam" class="space-y-6">
             <div>
@@ -178,4 +179,5 @@ new #[Title('Teams')] class extends Component {
             </div>
         </form>
     </flux:modal>
+    @endcan
 </section>

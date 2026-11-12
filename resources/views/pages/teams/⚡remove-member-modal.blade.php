@@ -30,9 +30,9 @@ new class extends Component {
 
     public function removeMember(): void
     {
-        Gate::authorize('removeMember', $this->team);
-
         $user = User::findOrFail($this->memberId);
+
+        Gate::authorize('removeMember', [$this->team, $user]);
 
         if ($this->memberName === '') {
             $this->memberName = $user->name;
@@ -43,7 +43,7 @@ new class extends Component {
             ->delete();
 
         if ($user->isCurrentTeam($this->team)) {
-            $user->switchTeam($user->personalTeam());
+            $user->switchToFallbackTeam($this->team);
         }
 
         $this->dispatch('close-modal', name: $this->modalName);

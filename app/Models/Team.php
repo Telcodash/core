@@ -3,9 +3,9 @@
 namespace App\Models;
 
 use App\Concerns\GeneratesUniqueTeamSlugs;
-use App\Enums\TeamRole;
 use Database\Factories\TeamFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -18,15 +18,13 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property string $name
  * @property string $slug
- * @property bool $is_personal
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
- * @property-read Collection<int, TeamInvitation> $invitations
  * @property-read Collection<int, Membership> $memberships
  * @property-read Collection<int, User> $members
  */
-#[Fillable(['name', 'slug', 'is_personal'])]
+#[Fillable(['name', 'slug'])]
 class Team extends Model
 {
     /** @use HasFactory<TeamFactory> */
@@ -53,16 +51,6 @@ class Team extends Model
     }
 
     /**
-     * Get the team owner.
-     */
-    public function owner(): ?Model
-    {
-        return $this->members()
-            ->wherePivot('role', TeamRole::Owner->value)
-            ->first();
-    }
-
-    /**
      * Get all members of this team.
      *
      * @return BelongsToMany<User, $this, Membership, 'pivot'>
@@ -71,8 +59,27 @@ class Team extends Model
     {
         return $this->belongsToMany(User::class, 'team_members', 'team_id', 'user_id')
             ->using(Membership::class)
-            ->withPivot(['role'])
             ->withTimestamps();
+    }
+
+    /**
+     * Get the managers of this team.
+     *
+     * @return BelongsToMany<User, $this, Membership, 'pivot'>
+     */
+    public function managers(): BelongsToMany
+    {
+        return $this->members()->withRole(Role::MANAGER);
+    }
+
+    /**
+     * Get the advisor-tier (advisor and advisor_plus) members of this team.
+     *
+     * @return BelongsToMany<User, $this, Membership, 'pivot'>
+     */
+    public function advisors(): BelongsToMany
+    {
+        return $this->members()->withRole(Role::ADVISOR, Role::ADVISOR_PLUS);
     }
 
     /**
@@ -86,25 +93,81 @@ class Team extends Model
     }
 
     /**
-     * Get all invitations for this team.
-     *
-     * @return HasMany<TeamInvitation, $this>
+     * Determine if the team has at least one manager.
      */
-    public function invitations(): HasMany
+    public function hasManager(): bool
     {
-        return $this->hasMany(TeamInvitation::class);
+        return $this->managers()->exists();
     }
 
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
+     * Determine if the given member can be removed from this team without leaving
+     * any advisor-tier user without a managed team.
      */
-    protected function casts(): array
+    public function canDetach(User $member): bool
     {
-        return [
-            'is_personal' => 'boolean',
-        ];
+        if (! $member->belongsToTeam($this)) {
+            return false;
+        }
+
+        // An advisor must keep at least one other team that has a manager.
+        if ($member->role->requiresTeamManager()) {
+            return $member->hasManagedTeam(excluding: $this);
+        }
+
+        // The last manager cannot leave a team that still has advisors who depend on it.
+        if ($member->isManager()) {
+            $otherManagers = $this->managers()->where('users.id', '!=', $member->id)->exists();
+
+            return $otherManagers || $this->advisorsDependingOnThisTeam()->isEmpty();
+        }
+
+        return true;
+    }
+
+    /**
+     * Determine if the team can be deleted without stranding any advisor.
+     */
+    public function canBeDeleted(): bool
+    {
+        return $this->advisorsDependingOnThisTeam()->isEmpty();
+    }
+
+    /**
+     * Get advisors whose only managed team is this one.
+     *
+     * @return Collection<int, User>
+     */
+    public function advisorsDependingOnThisTeam(): Collection
+    {
+        return $this->advisors()
+            ->get()
+            ->reject(fn (User $advisor) => $advisor->hasManagedTeam(excluding: $this))
+            ->values();
+    }
+
+    /**
+     * Scope the query to teams that have at least one manager.
+     *
+     * @param  Builder<static>  $query
+     */
+    public function scopeWithManager(Builder $query): void
+    {
+        $query->whereHas('members', fn (Builder $member) => $member->withRole(Role::MANAGER));
+    }
+
+    /**
+     * Scope the query to teams the given user is allowed to see.
+     *
+     * @param  Builder<static>  $query
+     */
+    public function scopeVisibleTo(Builder $query, User $user): void
+    {
+        if ($user->role->canViewAllTeams()) {
+            return;
+        }
+
+        $query->whereHas('members', fn (Builder $member) => $member->whereKey($user->id));
     }
 
     /**

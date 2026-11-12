@@ -31,7 +31,7 @@ new class extends Component {
         $user = Auth::user();
 
         abort_unless(
-            $user->belongsToTeam($team = Team::where('slug', $slug)->firstOrFail()),
+            $user->canAccessTeam($team = Team::where('slug', $slug)->firstOrFail()),
             403
         );
 
@@ -108,13 +108,15 @@ new class extends Component {
                 </flux:menu.item>
             @endforeach
 
-            <flux:menu.separator />
+            @can('create', App\Models\Team::class)
+                <flux:menu.separator />
 
-            <flux:modal.trigger name="create-team-switcher">
-                <flux:menu.item icon="plus" class="cursor-pointer" data-test="team-switcher-new-team">
-                    {{ __('New team') }}
-                </flux:menu.item>
-            </flux:modal.trigger>
+                <flux:modal.trigger name="create-team-switcher">
+                    <flux:menu.item icon="plus" class="cursor-pointer" data-test="team-switcher-new-team">
+                        {{ __('New team') }}
+                    </flux:menu.item>
+                </flux:modal.trigger>
+            @endcan
         </flux:menu>
     </flux:dropdown>
 </div>
