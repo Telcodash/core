@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Services\TaskQueue\QueueServiceClient;
+use App\Services\TaskQueue\TaskQueue;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +17,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(QueueServiceClient::class, fn ($app) => new QueueServiceClient(
+            $app['config']->get('services.queue'),
+        ));
+
+        $this->app->singleton(TaskQueue::class, fn ($app) => new TaskQueue(
+            $app->make(QueueServiceClient::class),
+            $app['config']->get('services.queue'),
+        ));
     }
 
     /**

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\ServiceController;
 use App\Http\Controllers\Admin\TeamController;
 use App\Http\Controllers\Admin\TeamMemberController as AdminTeamMemberController;
 use App\Http\Controllers\Admin\TeamSearchController;
@@ -28,6 +29,12 @@ Route::middleware(['auth', 'role:administrator'])->prefix('admin/users')->name('
     Route::post('/', [UserController::class, 'store'])->name('store');
     Route::patch('{user}', [UserController::class, 'update'])->name('update');
     Route::delete('{user}', [UserController::class, 'destroy'])->name('destroy');
+});
+
+Route::middleware(['auth', 'role:administrator'])->prefix('admin/services')->name('services.')->group(function () {
+    Route::get('/', [ServiceController::class, 'index'])->name('index');
+    Route::post('queue/test', [ServiceController::class, 'testQueue'])->middleware('throttle:10,1')->name('queue.test');
+    Route::get('queue/tasks/{task}', [ServiceController::class, 'task'])->name('queue.task');
 });
 
 Route::prefix('{current_team}')

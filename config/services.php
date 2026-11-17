@@ -35,4 +35,20 @@ return [
         ],
     ],
 
+    /*
+    | BullMQ task service (../queue). Core dispatches over HTTP and receives
+    | signed lifecycle webhooks at the `webhooks.queue` route.
+    */
+    'queue' => [
+        'url' => env('QUEUE_SERVICE_URL', 'http://127.0.0.1:3100'),
+        'token' => env('QUEUE_SERVICE_TOKEN'),
+        'webhook_secret' => env('QUEUE_SERVICE_WEBHOOK_SECRET'),
+        // Override when the queue service reaches Core on a different host than APP_URL.
+        'callback_url' => env('QUEUE_SERVICE_CALLBACK_URL'),
+        'default_queue' => env('QUEUE_SERVICE_DEFAULT_QUEUE', 'default'),
+        'timeout' => (float) env('QUEUE_SERVICE_TIMEOUT', 5),
+        'connect_timeout' => (float) env('QUEUE_SERVICE_CONNECT_TIMEOUT', 2),
+        'signature_tolerance' => (int) env('QUEUE_SERVICE_SIGNATURE_TOLERANCE', 300),
+    ],
+
 ];
