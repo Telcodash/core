@@ -129,7 +129,7 @@ export default function Users({ users, search, roles, teams }: Props) {
                     {search && ` matching “${search}”`}
                 </p>
 
-                <div className="overflow-x-auto rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
+                <div className="overflow-x-auto rounded-xl glass">
                     <table className="w-full text-sm">
                         <caption className="sr-only">Users</caption>
                         <thead className="border-b bg-muted/40 text-left text-muted-foreground">

@@ -217,7 +217,7 @@ function MetricTile({
             onClick={onSelect}
             aria-pressed={selected}
             className={cn(
-                'rounded-xl border bg-card p-4 text-left transition-colors hover:bg-muted/40 [&_svg]:size-4',
+                'rounded-xl glass p-4 text-left transition-[transform,box-shadow,background-color] duration-300 ease-(--ease-out-expo) hover:-translate-y-0.5 hover:shadow-lg [&_svg]:size-4',
                 selected && 'border-foreground/40 ring-1 ring-foreground/20',
             )}
             data-test={`usage-tile-${metric}`}
@@ -637,9 +637,9 @@ function PeriodsTable({ periods }: { periods: Period[] }) {
         );
 
     return (
-        <div className="overflow-x-auto rounded-xl border">
+        <div className="overflow-x-auto rounded-xl glass">
             <table className="w-full text-sm" data-test="usage-table">
-                <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+                <thead className="border-b bg-muted/40 text-left text-xs tracking-wide text-muted-foreground uppercase">
                     <tr>
                         <th className="px-3 py-2.5 font-medium">Period</th>
                         <th className="px-3 py-2.5 font-medium">Tariff</th>
@@ -790,7 +790,7 @@ export default function NumberUsage({
             )}
 
             {usage && current && !hasUsage && (
-                <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                <p className="rounded-xl border border-dashed border-primary/20 bg-glass/50 p-4 text-sm text-muted-foreground">
                     No usage recorded for this number in the last{' '}
                     {periods.length} billing periods.
                 </p>

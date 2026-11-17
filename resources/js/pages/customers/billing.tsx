@@ -67,7 +67,7 @@ export default function CustomerBilling({
                 )}
 
                 {accounts && accounts.length === 0 && (
-                    <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                    <p className="rounded-xl border border-dashed border-primary/20 bg-glass/50 p-4 text-sm text-muted-foreground">
                         This customer has no billing accounts.
                     </p>
                 )}

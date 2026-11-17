@@ -94,9 +94,10 @@ function BackToSearch() {
                     ? window.history.back()
                     : router.visit(dashboard(currentTeam?.slug ?? ''))
             }
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            className="group inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
-            <ArrowLeft className="size-4" /> Back
+            <ArrowLeft className="size-4 transition-transform duration-200 group-hover:-translate-x-0.5" />{' '}
+            Back
         </button>
     );
 }
@@ -127,10 +128,10 @@ function CustomerNav({ customerId }: { customerId: string }) {
                         href={href}
                         aria-current={active ? 'page' : undefined}
                         className={cn(
-                            '-mb-px border-b-2 px-3 py-2 text-sm whitespace-nowrap transition-colors',
+                            "relative -mb-px px-3 py-2.5 text-sm whitespace-nowrap transition-colors duration-200 after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:origin-center after:rounded-full after:bg-primary after:transition-transform after:duration-300 after:ease-(--ease-out-expo) after:content-['']",
                             active
-                                ? 'border-foreground font-medium text-foreground'
-                                : 'border-transparent text-muted-foreground hover:text-foreground',
+                                ? 'font-medium text-foreground after:scale-x-100'
+                                : 'text-muted-foreground after:scale-x-0 hover:text-foreground hover:after:scale-x-50 hover:after:bg-primary/40',
                         )}
                     >
                         {title}
@@ -169,7 +170,7 @@ export function CustomerShell({
 
             <div
                 className={cn(
-                    'mx-auto w-full max-w-6xl space-y-6 p-4',
+                    'mx-auto w-full max-w-6xl space-y-6 p-4 md:p-6',
                     className,
                 )}
             >

@@ -299,9 +299,9 @@ function ConfigRow({
 
 function QueueTable({ queues }: { queues: QueueStats[] }) {
     return (
-        <div className="overflow-x-auto rounded-lg border">
+        <div className="overflow-x-auto rounded-xl glass">
             <table className="w-full text-sm" data-test="queue-table">
-                <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+                <thead className="border-b bg-muted/40 text-left text-xs tracking-wide text-muted-foreground uppercase">
                     <tr>
                         <th className="px-3 py-2 font-medium">Queue</th>
                         <th className="px-3 py-2 font-medium">Consumer</th>
@@ -409,9 +409,9 @@ function BillingRunsCard({ runs }: { runs: BillingRun[] | null }) {
                         No runs yet.
                     </p>
                 ) : (
-                    <div className="overflow-x-auto rounded-lg border">
+                    <div className="overflow-x-auto rounded-xl glass">
                         <table className="w-full text-sm">
-                            <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+                            <thead className="border-b bg-muted/40 text-left text-xs tracking-wide text-muted-foreground uppercase">
                                 <tr>
                                     <th className="px-3 py-2 font-medium">
                                         Date

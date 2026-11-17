@@ -87,7 +87,7 @@ export function TeamMembers({
                     </div>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
+                <div className="overflow-x-auto rounded-xl glass">
                     <table className="w-full text-sm">
                         <caption className="sr-only">
                             Members of {title}

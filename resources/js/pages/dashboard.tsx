@@ -24,6 +24,7 @@ import {
 } from '@/components/customer-status';
 import { dashboard } from '@/routes';
 import { show } from '@/routes/customers';
+import { cn } from '@/lib/utils';
 
 type SearchState = {
     q: string;
@@ -152,7 +153,7 @@ export default function Dashboard({
         <>
             <Head title="Customers" />
 
-            <div className="mx-auto w-full max-w-6xl space-y-6 p-4">
+            <div className="mx-auto w-full max-w-6xl space-y-6 p-4 md:p-6">
                 <Heading
                     title="Customers"
                     description="Find a customer by name, postcode, email, mobile number, account number or customer ID"
@@ -165,8 +166,8 @@ export default function Dashboard({
                     data-test="customer-search-form"
                 >
                     <div className="flex flex-col gap-2 sm:flex-row">
-                        <div className="relative flex-1">
-                            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <div className="group relative flex-1">
+                            <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
                             <Input
                                 autoFocus
                                 type="search"
@@ -176,7 +177,7 @@ export default function Dashboard({
                                     setForm({ ...form, q: e.target.value })
                                 }
                                 placeholder="Search customers…"
-                                className="h-11 pl-9 text-base"
+                                className="h-12 rounded-xl pl-10 text-base shadow-sm focus-visible:shadow-[0_8px_24px_-8px_oklch(0.55_0.21_262/0.35)]"
                                 aria-label="Search customers"
                                 maxLength={100}
                                 data-test="customer-search-input"
@@ -186,7 +187,7 @@ export default function Dashboard({
                             <Button
                                 type="button"
                                 variant="outline"
-                                className="h-11"
+                                className="h-12 rounded-xl"
                                 onClick={() => setShowFilters((v) => !v)}
                                 aria-expanded={showFilters}
                                 aria-controls="customer-filters"
@@ -201,7 +202,7 @@ export default function Dashboard({
                             </Button>
                             <Button
                                 type="submit"
-                                className="h-11 flex-1 sm:flex-none"
+                                className="h-12 flex-1 rounded-xl px-5 sm:flex-none"
                                 disabled={!hasInput || searching}
                                 data-test="customer-search-submit"
                             >
@@ -215,7 +216,7 @@ export default function Dashboard({
                     {showFilters && (
                         <div
                             id="customer-filters"
-                            className="grid gap-4 rounded-lg border bg-muted/30 p-4 sm:grid-cols-2 lg:grid-cols-5"
+                            className="grid origin-top animate-rise-in gap-4 rounded-xl glass p-4 sm:grid-cols-2 lg:grid-cols-5"
                         >
                             {FILTERS.map((filter) => (
                                 <div key={filter.key} className="grid gap-1.5">
@@ -282,9 +283,10 @@ export default function Dashboard({
                 {results && (
                     <section
                         aria-busy={searching}
-                        className={
-                            searching ? 'opacity-60 transition-opacity' : ''
-                        }
+                        className={cn(
+                            'transition-opacity duration-200',
+                            searching && 'opacity-60',
+                        )}
                     >
                         <div className="mb-3 flex items-center justify-between gap-4">
                             <p
@@ -301,7 +303,7 @@ export default function Dashboard({
                         </div>
 
                         {results.total === 0 ? (
-                            <div className="rounded-xl border border-dashed p-10 text-center">
+                            <div className="rounded-xl border border-dashed border-primary/20 bg-glass/50 p-10 text-center">
                                 <p className="font-medium">
                                     No matching customers
                                 </p>
@@ -328,7 +330,12 @@ export default function Dashboard({
                                             key={i}
                                             href={link.url}
                                             preserveState
-                                            className={`rounded-md border px-3 py-1.5 text-sm ${link.active ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                                            className={cn(
+                                                'rounded-lg border px-3 py-1.5 text-sm transition-colors duration-200',
+                                                link.active
+                                                    ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                                                    : 'bg-glass backdrop-blur-sm hover:border-primary/30 hover:bg-accent hover:text-accent-foreground',
+                                            )}
                                             aria-current={
                                                 link.active ? 'page' : undefined
                                             }
@@ -339,7 +346,7 @@ export default function Dashboard({
                                     ) : (
                                         <span
                                             key={i}
-                                            className="rounded-md border px-3 py-1.5 text-sm text-muted-foreground opacity-50"
+                                            className="rounded-lg border px-3 py-1.5 text-sm text-muted-foreground opacity-50"
                                             dangerouslySetInnerHTML={{
                                                 __html: link.label,
                                             }}
@@ -367,9 +374,9 @@ function ResultsTable({
         show({ current_team: teamSlug, customer: id });
 
     return (
-        <div className="overflow-x-auto rounded-xl border">
+        <div className="overflow-x-auto rounded-xl glass">
             <table className="w-full text-sm" data-test="customer-results">
-                <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+                <thead className="border-b bg-muted/40 text-left text-xs tracking-wide text-muted-foreground uppercase">
                     <tr>
                         <th className="px-4 py-2.5 font-medium">Customer</th>
                         <th className="px-4 py-2.5 font-medium">
@@ -380,11 +387,11 @@ function ResultsTable({
                         <th className="w-8 px-2" aria-hidden />
                     </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="stagger divide-y divide-border/60">
                     {customers.map((customer) => (
                         <tr
                             key={customer.id}
-                            className="group relative cursor-pointer hover:bg-muted/40"
+                            className="group relative cursor-pointer hover:bg-primary/[0.04]"
                             onClick={() =>
                                 router.visit(customerUrl(customer.id))
                             }
@@ -392,7 +399,7 @@ function ResultsTable({
                             <td className="px-4 py-3">
                                 <Link
                                     href={customerUrl(customer.id)}
-                                    className="font-medium hover:underline"
+                                    className="font-medium transition-colors group-hover:text-primary hover:underline"
                                     onClick={(e) => e.stopPropagation()}
                                 >
                                     {customer.name}
@@ -447,7 +454,7 @@ function ResultsTable({
                                 )}
                             </td>
                             <td className="px-2 text-muted-foreground">
-                                <ChevronRight className="size-4 opacity-0 transition-opacity group-hover:opacity-100" />
+                                <ChevronRight className="size-4 -translate-x-1 opacity-0 transition-[opacity,transform] duration-200 group-hover:translate-x-0 group-hover:text-primary group-hover:opacity-100" />
                             </td>
                         </tr>
                     ))}
@@ -459,20 +466,20 @@ function ResultsTable({
 
 function EmptyState({ onPick }: { onPick: (query: string) => void }) {
     return (
-        <div className="rounded-xl border border-dashed p-8">
+        <div className="rounded-xl border border-dashed border-primary/20 bg-glass/50 p-8">
             <p className="font-medium">Search tips</p>
             <p className="mt-1 text-sm text-muted-foreground">
                 The search box works out what you typed. Try:
             </p>
-            <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+            <ul className="mt-4 grid stagger gap-2 sm:grid-cols-2">
                 {EXAMPLES.map((example) => (
                     <li key={example.query}>
                         <button
                             type="button"
                             onClick={() => onPick(example.query)}
-                            className="flex w-full items-baseline gap-3 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+                            className="group flex w-full items-baseline gap-3 rounded-lg px-2 py-1.5 text-left text-sm transition-colors duration-200 hover:bg-accent"
                         >
-                            <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                            <code className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs transition-colors group-hover:bg-primary/10 group-hover:text-primary">
                                 {example.query}
                             </code>
                             <span className="text-muted-foreground">

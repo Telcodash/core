@@ -75,12 +75,12 @@ export default function Tariffs({ tariffs, error }: Props) {
                 )}
 
                 {tariffs.length > 0 && (
-                    <div className="overflow-x-auto rounded-xl border">
+                    <div className="overflow-x-auto rounded-xl glass">
                         <table
                             className="w-full text-sm"
                             data-test="tariffs-table"
                         >
-                            <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+                            <thead className="border-b bg-muted/40 text-left text-xs tracking-wide text-muted-foreground uppercase">
                                 <tr>
                                     <th className="px-4 py-2.5 font-medium">
                                         Tariff
