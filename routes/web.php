@@ -1,11 +1,14 @@
 <?php
 
 use App\Http\Controllers\Admin\ServiceController;
+use App\Http\Controllers\Admin\TariffController;
 use App\Http\Controllers\Admin\TeamController;
 use App\Http\Controllers\Admin\TeamMemberController as AdminTeamMemberController;
 use App\Http\Controllers\Admin\TeamSearchController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\NumberUsageController;
 use App\Http\Controllers\Team\TeamMemberController;
 use App\Http\Middleware\EnsureTeamMembership;
 use Illuminate\Support\Facades\Route;
@@ -31,6 +34,14 @@ Route::middleware(['auth', 'role:administrator'])->prefix('admin/users')->name('
     Route::delete('{user}', [UserController::class, 'destroy'])->name('destroy');
 });
 
+Route::middleware(['auth', 'role:administrator'])->prefix('admin/tariffs')->name('tariffs.')->group(function () {
+    Route::get('/', [TariffController::class, 'index'])->name('index');
+    Route::post('/', [TariffController::class, 'store'])->name('store');
+    Route::patch('{tariff}', [TariffController::class, 'update'])
+        ->where('tariff', 'trf_[0-9A-HJKMNP-TV-Z]{26}')
+        ->name('update');
+});
+
 Route::middleware(['auth', 'role:administrator'])->prefix('admin/services')->name('services.')->group(function () {
     Route::get('/', [ServiceController::class, 'index'])->name('index');
     Route::post('queue/test', [ServiceController::class, 'testQueue'])->middleware('throttle:10,1')->name('queue.test');
@@ -41,6 +52,17 @@ Route::prefix('{current_team}')
     ->middleware(['auth', EnsureTeamMembership::class])
     ->group(function () {
         Route::get('dashboard', DashboardController::class)->name('dashboard');
+
+        Route::where(['customer' => 'cus_[0-9A-HJKMNP-TV-Z]{26}'])->group(function () {
+            Route::get('customers/{customer}', [CustomerController::class, 'show'])->name('customers.show');
+            Route::get('customers/{customer}/details', [CustomerController::class, 'details'])->name('customers.details');
+            Route::get('customers/{customer}/numbers', [CustomerController::class, 'numbers'])->name('customers.numbers');
+            Route::get('customers/{customer}/billing', [CustomerController::class, 'billing'])->name('customers.billing');
+        });
+
+        Route::get('customers/{customer}/numbers/{msisdn}/usage', [NumberUsageController::class, 'show'])
+            ->where(['customer' => 'cus_[0-9A-HJKMNP-TV-Z]{26}', 'msisdn' => '447\d{9}'])
+            ->name('customers.usage');
 
         Route::get('team', [TeamMemberController::class, 'index'])->name('team.index');
 

@@ -35,6 +35,28 @@ class QueueServiceClient
     }
 
     /**
+     * Run a task and block until it finishes (`POST /tasks?wait=`). For interactive reads.
+     * Throws QueueServiceException on transport errors, 503 (no workers) and 504 (timed out).
+     *
+     * @param  array{queue: string, name: string, payload: array<string, mixed>, options?: array<string, mixed>}  $task
+     * @return array<string, mixed> The finished task: `state` is "completed" (with `result`) or "failed" (with `error`).
+     */
+    public function call(array $task, int $waitMs): array
+    {
+        $task['options'] = (object) ($task['options'] ?? []);
+        $task['payload'] = (object) $task['payload'];
+
+        // The HTTP timeout must outlast the server-side wait.
+        $timeout = $waitMs / 1000 + $this->config['timeout'];
+
+        $body = $this->send('call', fn (PendingRequest $http) => $http
+            ->timeout($timeout)
+            ->post('/tasks?wait='.$waitMs, $task))->json();
+
+        return is_array($body) ? $body : [];
+    }
+
+    /**
      * Fetch a task's live state, or null if the queue service no longer has it.
      *
      * @return array<string, mixed>|null
@@ -59,7 +81,7 @@ class QueueServiceClient
     /**
      * Probe the service. Never throws: connection problems are reported in the result.
      *
-     * @return array{reachable: bool, latency_ms: int|null, queues: list<string>, error: string|null}
+     * @return array{reachable: bool, latency_ms: int|null, queues: list<array{name: string, workers: int, waiting: int, active: int, delayed: int, failed: int}>, error: string|null}
      */
     public function health(): array
     {
@@ -81,9 +103,37 @@ class QueueServiceClient
         return [
             'reachable' => $response->successful(),
             'latency_ms' => $latency,
-            'queues' => is_array($queues) ? array_values(array_filter($queues, 'is_string')) : [],
+            'queues' => is_array($queues) ? $this->parseQueues($queues) : [],
             'error' => $response->successful() ? null : "HTTP {$response->status()}: ".($response->json('error') ?? $response->body()),
         ];
+    }
+
+    /**
+     * @param  array<mixed>  $queues
+     * @return list<array{name: string, workers: int, waiting: int, active: int, delayed: int, failed: int}>
+     */
+    private function parseQueues(array $queues): array
+    {
+        $parsed = [];
+
+        foreach ($queues as $queue) {
+            if (! is_array($queue) || ! is_string($queue['name'] ?? null)) {
+                continue;
+            }
+
+            $int = fn (string $key): int => is_int($queue[$key] ?? null) ? $queue[$key] : 0;
+
+            $parsed[] = [
+                'name' => $queue['name'],
+                'workers' => $int('workers'),
+                'waiting' => $int('waiting'),
+                'active' => $int('active'),
+                'delayed' => $int('delayed'),
+                'failed' => $int('failed'),
+            ];
+        }
+
+        return $parsed;
     }
 
     /**

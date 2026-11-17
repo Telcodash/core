@@ -51,4 +51,40 @@ return [
         'signature_tolerance' => (int) env('QUEUE_SERVICE_SIGNATURE_TOLERANCE', 300),
     ],
 
+    /*
+    | Customer Account Daemon (../customer-daemon), reached through the queue service.
+    */
+    'customers' => [
+        // How long an interactive lookup waits for the daemon before giving up.
+        'timeout_ms' => (int) env('CUSTOMER_DAEMON_TIMEOUT_MS', 5000),
+    ],
+
+    /*
+    | Billing Daemon (../billing-daemon), reached through the queue service.
+    */
+    'billing' => [
+        'timeout_ms' => (int) env('BILLING_DAEMON_TIMEOUT_MS', 5000),
+    ],
+
+    /*
+    | MSISDN Daemon (../msisdn-daemon): mobile number inventory and assignments.
+    */
+    'msisdn' => [
+        'timeout_ms' => (int) env('MSISDN_DAEMON_TIMEOUT_MS', 5000),
+    ],
+
+    /*
+    | Subscription Daemon (../subscription-daemon): tariff catalogue and lines.
+    */
+    'subscriptions' => [
+        'timeout_ms' => (int) env('SUBSCRIPTION_DAEMON_TIMEOUT_MS', 5000),
+    ],
+
+    /*
+    | Usage Daemon (../usage-daemon): calls, texts and data used per number (generated dummy usage).
+    */
+    'usage' => [
+        'timeout_ms' => (int) env('USAGE_DAEMON_TIMEOUT_MS', 5000),
+    ],
+
 ];

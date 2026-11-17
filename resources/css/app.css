@@ -141,3 +141,17 @@
         @apply bg-background text-foreground;
     }
 }
+
+/*
+ * Usage charts (pages/customers/usage.tsx): categorical slots 1–2 of the validated data-viz palette,
+ * stepped separately for each theme. Series 1 is the current period, series 2 the one compared with.
+ */
+.usage-viz {
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+}
+
+.dark .usage-viz {
+    --series-1: #3987e5;
+    --series-2: #d95926;
+}

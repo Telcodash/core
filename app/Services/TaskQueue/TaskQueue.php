@@ -68,6 +68,35 @@ class TaskQueue
     }
 
     /**
+     * Run a task synchronously and return its result. For interactive reads (e.g. searches).
+     *
+     * Unlike dispatch(), nothing is recorded: no `queue_tasks` row is written, and the task is
+     * ephemeral in the queue service, so personal data in results only lives in the owning daemon.
+     *
+     * @param  array<string, mixed>  $payload
+     *
+     * @throws QueueServiceException when the service is unreachable, has no workers for the queue, or times out
+     * @throws TaskFailedException when the worker reports failure
+     */
+    public function call(string $name, array $payload = [], ?string $queue = null, int $timeoutMs = 5000): mixed
+    {
+        $queue ??= $this->config['default_queue'];
+
+        $response = $this->client->call([
+            'queue' => $queue,
+            'name' => $name,
+            'payload' => $payload,
+            'options' => ['ephemeral' => true, 'attempts' => 1],
+        ], $timeoutMs);
+
+        if (($response['state'] ?? null) !== 'completed') {
+            throw new TaskFailedException($queue, $name, (string) ($response['error'] ?? 'Unknown error'));
+        }
+
+        return $response['result'] ?? null;
+    }
+
+    /**
      * Send (or re-send) a recorded task. Safe to repeat: the queue service de-duplicates by id.
      */
     public function send(QueueTask $task): QueueTask

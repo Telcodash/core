@@ -18,6 +18,9 @@ class ServicesPageTest extends TestCase
     {
         parent::setUp();
 
+        // Don't depend on the Vite dev server or a fresh build for these server-side assertions.
+        $this->withoutVite();
+
         config([
             'services.queue.url' => 'http://queue.test',
             'services.queue.token' => 'test-token',
@@ -38,7 +41,11 @@ class ServicesPageTest extends TestCase
 
     public function test_page_shows_queue_status_and_configuration(): void
     {
-        Http::fake(['queue.test/health' => Http::response(['status' => 'ok', 'queues' => ['default', 'reports']])]);
+        Http::fake(['queue.test/health' => Http::response(['status' => 'ok', 'queues' => [
+            ['name' => 'default', 'workers' => 1, 'waiting' => 0, 'active' => 0, 'delayed' => 0, 'failed' => 2],
+            ['name' => 'customers', 'workers' => 0, 'waiting' => 3, 'active' => 0, 'delayed' => 0, 'failed' => 0],
+            'malformed',
+        ]])]);
         QueueTask::create(['queue' => 'default', 'name' => 'x', 'payload' => [], 'status' => QueueTaskStatus::Completed]);
 
         $this->actingAs(User::factory()->administrator()->create())
@@ -46,7 +53,11 @@ class ServicesPageTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('admin/services/index')
                 ->where('queue.reachable', true)
-                ->where('queue.queues', ['default', 'reports'])
+                ->has('queue.queues', 2)
+                ->where('queue.queues.0.name', 'default')
+                ->where('queue.queues.0.failed', 2)
+                ->where('queue.queues.1.name', 'customers')
+                ->where('queue.queues.1.workers', 0)
                 ->where('queue.error', null)
                 ->where('queue.token_configured', true)
                 ->where('queue.webhook_secret_configured', false)
@@ -71,7 +82,7 @@ class ServicesPageTest extends TestCase
     public function test_test_dispatches_a_task_when_the_service_is_healthy(): void
     {
         Http::fake([
-            'queue.test/health' => Http::response(['status' => 'ok', 'queues' => ['default']]),
+            'queue.test/health' => Http::response(['status' => 'ok', 'queues' => [['name' => 'default', 'workers' => 1]]]),
             'queue.test/tasks' => Http::response(['state' => 'waiting'], 202),
         ]);
 

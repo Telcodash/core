@@ -1,5 +1,12 @@
 import { Link, usePage } from '@inertiajs/react';
-import { ArrowLeft, Building2, Server, ShieldCheck, Users } from 'lucide-react';
+import {
+    ArrowLeft,
+    Building2,
+    ReceiptText,
+    Server,
+    ShieldCheck,
+    Users,
+} from 'lucide-react';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -14,6 +21,7 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { index as servicesIndex } from '@/routes/services';
+import { index as tariffsIndex } from '@/routes/tariffs';
 import { index as teamsIndex } from '@/routes/teams';
 import { index as usersIndex } from '@/routes/users';
 import type { NavItem } from '@/types';
@@ -25,6 +33,7 @@ export function AdminSidebar() {
     const navItems: NavItem[] = [
         { title: 'Teams', href: teamsIndex(), icon: Building2 },
         { title: 'Users', href: usersIndex(), icon: Users },
+        { title: 'Tariffs', href: tariffsIndex(), icon: ReceiptText },
         { title: 'Services', href: servicesIndex(), icon: Server },
     ];
 

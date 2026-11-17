@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\QueueTaskStatus;
 use App\Http\Controllers\Controller;
 use App\Models\QueueTask;
+use App\Services\Billing\BillingDirectory;
 use App\Services\TaskQueue\QueueServiceClient;
 use App\Services\TaskQueue\QueueServiceException;
+use App\Services\TaskQueue\TaskFailedException;
 use App\Services\TaskQueue\TaskQueue;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,10 +23,18 @@ class ServiceController extends Controller
     /** The task the "Test" button runs: reports progress in 4 steps, then returns. */
     private const TEST_TASK = 'example.sleep';
 
-    public function index(QueueServiceClient $client): Response
+    public function index(QueueServiceClient $client, BillingDirectory $billing): Response
     {
         return Inertia::render('admin/services/index', [
             'queue' => fn () => $this->queueStatus($client),
+            // Proof the Billing Daemon's daily run is happening: null if it can't be reached.
+            'billingRuns' => function () use ($billing): ?array {
+                try {
+                    return $billing->recentRuns(7);
+                } catch (QueueServiceException|TaskFailedException) {
+                    return null;
+                }
+            },
         ]);
     }
 

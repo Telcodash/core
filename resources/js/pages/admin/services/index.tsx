@@ -17,11 +17,30 @@ import { Spinner } from '@/components/ui/spinner';
 import { index } from '@/routes/services';
 import { task as taskRoute, test as testRoute } from '@/routes/services/queue';
 
+type QueueStats = {
+    name: string;
+    workers: number;
+    waiting: number;
+    active: number;
+    delayed: number;
+    failed: number;
+};
+
 type Health = {
     reachable: boolean;
     latency_ms: number | null;
-    queues: string[];
+    queues: QueueStats[];
     error: string | null;
+};
+
+/** Which process consumes each queue, for the operator's benefit. */
+const QUEUE_OWNERS: Record<string, string> = {
+    default: 'Queue service (in-process)',
+    customers: 'Customer Account Daemon',
+    billing: 'Billing Daemon',
+    msisdn: 'MSISDN Daemon',
+    subscriptions: 'Subscription Daemon',
+    usage: 'Usage Daemon',
 };
 
 type QueueStatus = Health & {
@@ -131,7 +150,7 @@ function useQueueTest(onFinished: () => void) {
 
             log(
                 'success',
-                `✓ Health check OK (${health.latency_ms}ms) · queues: ${health.queues.join(', ')}`,
+                `✓ Health check OK (${health.latency_ms}ms) · queues: ${health.queues.map((q) => `${q.name} (${q.workers} workers)`).join(', ')}`,
             );
 
             if (!response.task) {
@@ -278,6 +297,66 @@ function ConfigRow({
     );
 }
 
+function QueueTable({ queues }: { queues: QueueStats[] }) {
+    return (
+        <div className="overflow-x-auto rounded-lg border">
+            <table className="w-full text-sm" data-test="queue-table">
+                <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+                    <tr>
+                        <th className="px-3 py-2 font-medium">Queue</th>
+                        <th className="px-3 py-2 font-medium">Consumer</th>
+                        <th className="px-3 py-2 text-right font-medium">
+                            Workers
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">
+                            Waiting
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">
+                            Active
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">
+                            Failed
+                        </th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y">
+                    {queues.map((q) => (
+                        <tr key={q.name}>
+                            <td className="px-3 py-2 font-mono">{q.name}</td>
+                            <td className="px-3 py-2 text-muted-foreground">
+                                {QUEUE_OWNERS[q.name] ?? '—'}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums">
+                                {q.workers > 0 ? (
+                                    <span className="text-emerald-600 dark:text-emerald-400">
+                                        {q.workers}
+                                    </span>
+                                ) : (
+                                    <span
+                                        className="inline-flex items-center gap-1 text-destructive"
+                                        title="Nothing is consuming this queue"
+                                    >
+                                        <XCircle className="size-3.5" /> 0
+                                    </span>
+                                )}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums">
+                                {q.waiting + q.delayed}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums">
+                                {q.active}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums">
+                                {q.failed}
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
 function Flag({ ok }: { ok: boolean }) {
     return ok ? (
         <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
@@ -290,7 +369,119 @@ function Flag({ ok }: { ok: boolean }) {
     );
 }
 
-export default function Services({ queue }: { queue: QueueStatus }) {
+type BillingRun = {
+    run_date: string;
+    invoices_issued: number;
+    amount_invoiced_pence: number;
+    payments_attempted: number;
+    payments_succeeded: number;
+    payments_failed: number;
+    amount_collected_pence: number;
+    accounts_suspended: number;
+    accounts_reactivated: number;
+    finished_at: string;
+};
+
+const gbp = (pence: number) =>
+    new Intl.NumberFormat('en-GB', {
+        style: 'currency',
+        currency: 'GBP',
+    }).format(pence / 100);
+
+function BillingRunsCard({ runs }: { runs: BillingRun[] | null }) {
+    return (
+        <Card data-test="billing-runs-card">
+            <CardHeader>
+                <CardTitle>Daily billing runs</CardTitle>
+                <CardDescription>
+                    The Billing Daemon issues invoices and collects payments
+                    every day at 02:00 UK time, and catches up on any days it
+                    missed while it was down.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                {runs === null ? (
+                    <p className="text-sm text-destructive">
+                        Billing Daemon unavailable.
+                    </p>
+                ) : runs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                        No runs yet.
+                    </p>
+                ) : (
+                    <div className="overflow-x-auto rounded-lg border">
+                        <table className="w-full text-sm">
+                            <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+                                <tr>
+                                    <th className="px-3 py-2 font-medium">
+                                        Date
+                                    </th>
+                                    <th className="px-3 py-2 text-right font-medium">
+                                        Invoiced
+                                    </th>
+                                    <th className="px-3 py-2 text-right font-medium">
+                                        Collected
+                                    </th>
+                                    <th className="px-3 py-2 text-right font-medium">
+                                        Payments ok / failed
+                                    </th>
+                                    <th className="px-3 py-2 text-right font-medium">
+                                        Suspended / reactivated
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y tabular-nums">
+                                {runs.map((run) => (
+                                    <tr key={run.run_date}>
+                                        <td className="px-3 py-2 font-mono text-xs">
+                                            {run.run_date}
+                                        </td>
+                                        <td className="px-3 py-2 text-right">
+                                            {gbp(run.amount_invoiced_pence)}
+                                            <span className="ml-1 text-xs text-muted-foreground">
+                                                ({run.invoices_issued})
+                                            </span>
+                                        </td>
+                                        <td className="px-3 py-2 text-right">
+                                            {gbp(run.amount_collected_pence)}
+                                        </td>
+                                        <td className="px-3 py-2 text-right">
+                                            <span className="text-emerald-600 dark:text-emerald-400">
+                                                {run.payments_succeeded}
+                                            </span>
+                                            {' / '}
+                                            <span
+                                                className={
+                                                    run.payments_failed > 0
+                                                        ? 'text-destructive'
+                                                        : undefined
+                                                }
+                                            >
+                                                {run.payments_failed}
+                                            </span>
+                                        </td>
+                                        <td className="px-3 py-2 text-right">
+                                            {run.accounts_suspended} /{' '}
+                                            {run.accounts_reactivated}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
+export default function Services({
+    queue,
+    billingRuns,
+}: {
+    queue: QueueStatus;
+    billingRuns: BillingRun[] | null;
+}) {
     const [refreshing, setRefreshing] = useState(false);
 
     const refresh = useCallback(
@@ -378,11 +569,6 @@ export default function Services({ queue }: { queue: QueueStatus }) {
                             <ConfigRow label="Webhook URL">
                                 {queue.callback_url}
                             </ConfigRow>
-                            <ConfigRow label="Queues">
-                                {queue.queues.length > 0
-                                    ? queue.queues.join(', ')
-                                    : '—'}
-                            </ConfigRow>
                             <ConfigRow label="API token">
                                 <Flag ok={queue.token_configured} />
                             </ConfigRow>
@@ -407,6 +593,10 @@ export default function Services({ queue }: { queue: QueueStatus }) {
                             </ConfigRow>
                         </dl>
 
+                        {queue.queues.length > 0 && (
+                            <QueueTable queues={queue.queues} />
+                        )}
+
                         <ConsoleOutput
                             lines={lines}
                             running={running}
@@ -414,6 +604,8 @@ export default function Services({ queue }: { queue: QueueStatus }) {
                         />
                     </CardContent>
                 </Card>
+
+                <BillingRunsCard runs={billingRuns} />
             </div>
         </>
     );
