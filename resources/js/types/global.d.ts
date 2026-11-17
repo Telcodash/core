@@ -1,4 +1,4 @@
-import type { Auth } from '@/types/auth';
+import type { Auth, Role } from '@/types/auth';
 import type { Team } from '@/types/teams';
 
 declare module 'react' {
@@ -14,7 +14,7 @@ declare module '@inertiajs/core' {
             auth: Auth;
             sidebarOpen: boolean;
             currentTeam: Team | null;
-            teams: Team[];
+            role: { value: Role; label: string } | null;
             [key: string]: unknown;
         };
     }

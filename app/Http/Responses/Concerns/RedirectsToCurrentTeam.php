@@ -19,11 +19,7 @@ trait RedirectsToCurrentTeam
 
     protected function currentTeam(Request $request): Team
     {
-        $user = $request->user();
-
-        abort_if(! $user, 403);
-
-        $team = $user->currentTeam ?? $user->personalTeam();
+        $team = $request->user()?->team;
 
         abort_if(! $team, 403);
 

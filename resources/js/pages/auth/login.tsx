@@ -1,44 +1,27 @@
 import { Form, Head } from '@inertiajs/react';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
-import TeamInvitationAlert from '@/components/team-invitation-alert';
 import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
-/* @chisel-registration */
-import { register } from '@/routes';
-/* @end-chisel-registration */
 import { store } from '@/routes/login';
 import { request } from '@/routes/password';
 /* @chisel-passkeys */
 import PasskeyVerify from '@/components/passkey-verify';
 /* @end-chisel-passkeys */
-import type { TeamInvitationContext } from '@/types';
 
 type Props = {
     status?: string;
     canResetPassword: boolean;
-    teamInvitation?: TeamInvitationContext | null;
 };
 
-export default function Login({
-    status,
-    canResetPassword,
-    teamInvitation,
-}: Props) {
+export default function Login({ status, canResetPassword }: Props) {
     return (
         <>
             <Head title="Log in" />
-
-            {teamInvitation && (
-                <TeamInvitationAlert
-                    invitation={teamInvitation}
-                    action="Log in"
-                />
-            )}
 
             {/* @chisel-passkeys */}
             <PasskeyVerify />
@@ -111,23 +94,6 @@ export default function Login({
                                 Log in
                             </Button>
                         </div>
-
-                        {/* @chisel-registration */}
-                        <div className="text-center text-sm text-muted-foreground">
-                            Don't have an account?{' '}
-                            <TextLink
-                                href={register({
-                                    query: {
-                                        invitation: teamInvitation?.code,
-                                    },
-                                })}
-                                data-test="register-link"
-                                tabIndex={5}
-                            >
-                                Sign up
-                            </TextLink>
-                        </div>
-                        {/* @end-chisel-registration */}
                     </>
                 )}
             </Form>

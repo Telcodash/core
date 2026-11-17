@@ -1,9 +1,12 @@
+export type Role = 'advisor' | 'advisor_plus' | 'manager' | 'administrator';
+
 export type User = {
     id: number;
     name: string;
     email: string;
     avatar?: string;
-    email_verified_at: string | null;
+    role: Role;
+    team_id: number | null;
     /* @chisel-2fa */
     two_factor_enabled?: boolean;
     /* @end-chisel-2fa */

@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Enums\TeamRole;
+use App\Enums\Role;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -22,6 +22,9 @@ class UserFactory extends Factory
     /**
      * Define the model's default state.
      *
+     * By default the user is a manager on a brand-new team, so the team has
+     * its required manager.
+     *
      * @return array<string, mixed>
      */
     public function definition(): array
@@ -29,9 +32,10 @@ class UserFactory extends Factory
         return [
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
-            'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+            'role' => Role::Manager,
+            'team_id' => Team::factory(),
             /* @chisel-2fa */
             'two_factor_secret' => null,
             'two_factor_recovery_codes' => null,
@@ -41,31 +45,48 @@ class UserFactory extends Factory
     }
 
     /**
-     * Configure the model factory.
+     * Give the user the specified role.
+     *
+     * Non-manager roles join a new team that is created with a manager, unless
+     * a team is supplied (via `forTeam()` or the `team_id` attribute).
      */
-    public function configure(): static
+    public function role(Role $role): static
     {
-        return $this->afterCreating(function ($user) {
-            $team = Team::factory()->personal()->create([
-                'name' => $user->name."'s Team",
-            ]);
+        return $this->state(fn (array $attributes) => [
+            'role' => $role,
+            // Keep an explicitly chosen team; otherwise a non-manager needs a team that already has a manager.
+            'team_id' => $role->isManagerOrAbove() || ! $attributes['team_id'] instanceof Factory
+                ? $attributes['team_id']
+                : fn () => User::factory()->create()->team_id,
+        ]);
+    }
 
-            $team->members()->attach($user, [
-                'role' => TeamRole::Owner->value,
-            ]);
+    public function advisor(): static
+    {
+        return $this->role(Role::Advisor);
+    }
 
-            $user->switchTeam($team);
-        });
+    public function advisorPlus(): static
+    {
+        return $this->role(Role::AdvisorPlus);
+    }
+
+    public function manager(): static
+    {
+        return $this->role(Role::Manager);
+    }
+
+    public function administrator(): static
+    {
+        return $this->role(Role::Administrator);
     }
 
     /**
-     * Indicate that the model's email address should be unverified.
+     * Place the user on an existing team.
      */
-    public function unverified(): static
+    public function forTeam(Team $team): static
     {
-        return $this->state(fn (array $attributes) => [
-            'email_verified_at' => null,
-        ]);
+        return $this->state(fn (array $attributes) => ['team_id' => $team->id]);
     }
 
     /* @chisel-2fa */

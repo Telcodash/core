@@ -15,11 +15,14 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
+        $manager = User::factory()->manager()->create([
+            'name' => 'Test Manager',
             'email' => 'test@example.com',
+        ]);
+
+        User::factory()->advisor()->forTeam($manager->team)->create([
+            'name' => 'Test Advisor',
+            'email' => 'advisor@example.com',
         ]);
     }
 }
