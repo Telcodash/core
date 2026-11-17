@@ -52,6 +52,16 @@ enum Role: string
     }
 
     /**
+     * Roles that a manager is allowed to edit and assign.
+     *
+     * @return array<int, self>
+     */
+    public static function managerAssignable(): array
+    {
+        return [self::Advisor, self::AdvisorPlus];
+    }
+
+    /**
      * Get the role values.
      *
      * @return array<int, string>
