@@ -11,4 +11,6 @@ export type NavItem = {
     href: NonNullable<InertiaLinkProps['href']>;
     icon?: LucideIcon | null;
     isActive?: boolean;
+    /** Opens in a new tab as a normal link. Omit for in-app (SPA) navigation. */
+    external?: boolean;
 };

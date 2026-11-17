@@ -1,5 +1,11 @@
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid, Users } from 'lucide-react';
+import {
+    BookOpen,
+    FolderGit2,
+    LayoutGrid,
+    ShieldCheck,
+    Users,
+} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -15,6 +21,7 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { index as teamIndex } from '@/routes/team';
+import { index as teamsIndex } from '@/routes/teams';
 import type { NavItem } from '@/types';
 
 export function AppSidebar() {
@@ -41,15 +48,27 @@ export function AppSidebar() {
     ];
 
     const footerNavItems: NavItem[] = [
+        // The administrator area is a separate console with its own sidebar.
+        ...(page.props.role?.value === 'administrator'
+            ? [
+                  {
+                      title: 'Admin Console',
+                      href: teamsIndex(),
+                      icon: ShieldCheck,
+                  },
+              ]
+            : []),
         {
             title: 'Repository',
             href: 'https://github.com/laravel/react-starter-kit',
             icon: FolderGit2,
+            external: true,
         },
         {
             title: 'Documentation',
             href: 'https://laravel.com/docs/starter-kits#react',
             icon: BookOpen,
+            external: true,
         },
     ];
 

@@ -6,6 +6,7 @@ use App\Actions\Users\CreateUser;
 use App\Enums\Role;
 use App\Models\Team;
 use App\Models\User;
+use App\Rules\ReservedTeamName;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -73,7 +74,7 @@ class CreateUserCommand extends Command
                 'password' => ['required', 'string', Password::default()],
                 'role' => ['required', Rule::enum(Role::class)],
                 'team' => ['nullable', 'required_without:new_team', 'prohibits:new_team', Rule::exists(Team::class, 'slug')->withoutTrashed()],
-                'new_team' => ['nullable', 'required_without:team', 'string', 'max:255'],
+                'new_team' => ['nullable', 'required_without:team', 'string', 'max:255', new ReservedTeamName],
             ])->after(function ($validator) use ($role, $newTeamName) {
                 if ($role !== null && $newTeamName !== null && ! $role->isManagerOrAbove()) {
                     $validator->errors()->add('new_team', 'Only a manager or above can start a new team; other roles must join an existing team.');
