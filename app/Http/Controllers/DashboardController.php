@@ -10,9 +10,11 @@ use App\Services\Customers\CustomerSearchResult;
 use App\Services\Customers\Data\Customer;
 use App\Services\TaskQueue\QueueServiceException;
 use App\Services\TaskQueue\TaskFailedException;
+use App\Support\Section;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 /**
  * The team dashboard: customer search across the Customer and Billing daemons.
@@ -41,6 +43,10 @@ class DashboardController extends Controller
             } catch (TaskFailedException $e) {
                 $error = 'The customer service rejected this search. Check the search terms and try again.';
                 Log::notice('Customer search rejected', ['reason' => $e->reason]);
+            } catch (Throwable $e) {
+                // Anything else (a malformed response, a bug): the search box and page still work.
+                Section::absorb($e, 'Customer search failed');
+                $error = 'Customer search failed. Please try again shortly.';
             }
         }
 

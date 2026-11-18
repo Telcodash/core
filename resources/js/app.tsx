@@ -1,4 +1,5 @@
 import { createInertiaApp } from '@inertiajs/react';
+import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { initializeTheme } from '@/hooks/use-appearance';
@@ -30,7 +31,10 @@ void createInertiaApp({
     withApp(app) {
         return (
             <TooltipProvider delayDuration={0}>
-                {app}
+                {/* Last resort, for a crash in a layout: pages and sections have their own. */}
+                <ErrorBoundary size="page" label="the app">
+                    {app}
+                </ErrorBoundary>
                 <Toaster />
             </TooltipProvider>
         );

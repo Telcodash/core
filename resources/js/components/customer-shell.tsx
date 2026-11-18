@@ -191,7 +191,10 @@ export function CustomerShell({
                     )}
                 >
                     {/* The spacing goes on the transition's wrapper: it holds the view's sections. */}
-                    <PageTransition className="block space-y-6">
+                    <PageTransition
+                        className="block space-y-6"
+                        errorLabel={`this customer’s ${title.toLowerCase()}`}
+                    >
                         {content}
                     </PageTransition>
                 </div>
@@ -249,7 +252,12 @@ export function CustomerShell({
                 </div>
 
                 {/* Only the view transitions between a customer's views; the header stays put. */}
-                <PageTransition className="block space-y-6">{content}</PageTransition>
+                <PageTransition
+                    className="block space-y-6"
+                    errorLabel={`this customer’s ${title.toLowerCase()}`}
+                >
+                    {content}
+                </PageTransition>
             </div>
         </>
     );

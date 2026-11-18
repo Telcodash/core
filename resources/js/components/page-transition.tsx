@@ -1,6 +1,7 @@
 import { router, usePage } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
+import { ErrorBoundary } from '@/components/error-boundary';
 import { cn } from '@/lib/utils';
 
 /**
@@ -59,14 +60,17 @@ export function PageTransition({
     transitionKey,
     scope,
     className,
+    errorLabel,
 }: {
     children: ReactNode;
     transitionKey?: string;
     /** Path prefix that this transition stays on: visits within it don't fade it out. */
     scope?: string;
     className?: string;
+    /** What the error message calls this content if it crashes; "this page" by default. */
+    errorLabel?: string;
 }) {
-    const { component } = usePage();
+    const { component, url } = usePage();
     const key = transitionKey ?? component;
     const leaving = useLeaving(key, scope);
 
@@ -82,7 +86,11 @@ export function PageTransition({
                 )}
                 data-leaving={leaving || undefined}
             >
-                {children}
+                {/* Page-level error boundary: a crash in the page leaves the layout around it working.
+                    Cleared on the next visit (the URL changes). */}
+                <ErrorBoundary size="page" label={errorLabel} resetKey={url}>
+                    {children}
+                </ErrorBoundary>
             </div>
         </div>
     );

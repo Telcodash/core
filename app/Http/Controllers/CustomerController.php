@@ -10,14 +10,15 @@ use App\Services\Customers\CustomerDirectory;
 use App\Services\Customers\Data\Customer;
 use App\Services\Numbers\NumberDirectory;
 use App\Services\Subscriptions\SubscriptionDirectory;
-use App\Services\TaskQueue\QueueServiceException;
 use App\Services\TaskQueue\TaskFailedException;
+use App\Support\Section;
 use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 /**
  * A customer, as four views sharing one header and sub-navigation:
@@ -30,6 +31,8 @@ use Inertia\Response;
  *
  * Each view asks only the daemons it shows. Every view needs the customer for its header; if the
  * Customer Account Daemon is down the view shows an error, and any other part degrades on its own.
+ * Each part loads inside a Section boundary: whatever goes wrong there, whether an outage, a
+ * refusal, a malformed response or a bug, only that part shows an error, never the whole page.
  */
 class CustomerController extends Controller
 {
@@ -52,7 +55,7 @@ class CustomerController extends Controller
             $numbersError = null;
 
             if ($accounts !== null) {
-                try {
+                [$numbers, $numbersError] = Section::load(function () use ($accounts) {
                     $numbers = [];
                     $accountNumbers = array_column($accounts, 'account_number', 'id');
                     foreach ($this->numbers->linesForAccounts(array_column($accounts, 'id')) as $accountId => $lines) {
@@ -60,10 +63,9 @@ class CustomerController extends Controller
                             $numbers[] = [...$line->toArray(), 'account_id' => $accountId, 'account_number' => $accountNumbers[$accountId] ?? null];
                         }
                     }
-                } catch (QueueServiceException|TaskFailedException $e) {
-                    Log::warning('Numbers unavailable for customer overview', ['customer_id' => $record->id, 'error' => $e->getMessage()]);
-                    [$numbers, $numbersError] = [null, 'Mobile numbers are unavailable right now.'];
-                }
+
+                    return $numbers;
+                }, 'Mobile numbers are unavailable right now.', 'Numbers unavailable for customer overview', ['customer_id' => $record->id]);
             }
 
             return [
@@ -117,8 +119,8 @@ class CustomerController extends Controller
             $name = $this->numbers->rename($msisdn, $accountIds, $validated['friendly_name']);
         } catch (TaskFailedException $e) {
             return back()->withErrors(['friendly_name' => preg_replace('/^Invalid payload: /', '', $e->reason)]);
-        } catch (QueueServiceException $e) {
-            Log::warning('Number rename unavailable', ['customer_id' => $customer, 'error' => $e->getMessage()]);
+        } catch (Throwable $e) {
+            Section::absorb($e, 'Number rename unavailable', ['customer_id' => $customer]); // rethrows the 404
 
             return back()->withErrors(['friendly_name' => 'Numbers can\'t be renamed right now. Please try again shortly.']);
         }
@@ -140,21 +142,20 @@ class CustomerController extends Controller
     public function billing(Request $request, Team $current_team, string $customer): Response
     {
         return $this->view('customers/billing', 'billing', $request, $current_team, $customer, function (Customer $record) {
-            try {
-                $accounts = array_map(fn (BillingAccount $account) => [
+            [$accounts, $billingError] = Section::load(
+                fn () => array_map(fn (BillingAccount $account) => [
                     ...$account->toArray(),
                     'invoices' => array_map(
                         fn (Invoice $invoice) => $invoice->toArray(),
                         $this->billing->invoices($account->id, perPage: self::RECENT_INVOICES)->items(),
                     ),
-                ], $this->billing->accountsForCustomer($record->id));
+                ], $this->billing->accountsForCustomer($record->id)),
+                'Billing information is unavailable right now.',
+                'Billing unavailable for customer page',
+                ['customer_id' => $record->id],
+            );
 
-                return ['accounts' => $accounts, 'billingError' => null];
-            } catch (QueueServiceException|TaskFailedException $e) {
-                Log::warning('Billing unavailable for customer page', ['customer_id' => $record->id, 'error' => $e->getMessage()]);
-
-                return ['accounts' => null, 'billingError' => 'Billing information is unavailable right now.'];
-            }
+            return ['accounts' => $accounts, 'billingError' => $billingError];
         });
     }
 
@@ -166,19 +167,24 @@ class CustomerController extends Controller
      */
     private function view(string $component, string $section, Request $request, Team $team, string $id, Closure $props): Response
     {
-        try {
+        // Not found is a 404; anything else wrong with the customer shows an error in place of the view.
+        [$found, $error] = Section::load(function () use ($id) {
             $record = $this->customers->find($id);
-        } catch (QueueServiceException $e) {
-            Log::warning('Customer lookup unavailable', ['customer_id' => $id, 'error' => $e->getMessage()]);
 
+            return $record === null ? false : [$record, [...$record->toArray(), 'age' => $record->age()]];
+        }, 'Customer details are unavailable right now. Please try again shortly.', 'Customer lookup unavailable', ['customer_id' => $id]);
+
+        abort_if($found === false, 404);
+
+        if ($found === null) {
             return Inertia::render($component, [
                 'customer' => null,
                 'customerId' => $id,
-                'error' => 'Customer details are unavailable right now. Please try again shortly.',
+                'error' => $error,
             ]);
         }
 
-        abort_if($record === null, 404);
+        [$record, $header] = $found;
 
         // Access to personal data is auditable: who opened which customer record, and which part.
         Log::info('Customer record viewed', [
@@ -189,7 +195,7 @@ class CustomerController extends Controller
         ]);
 
         return Inertia::render($component, [
-            'customer' => [...$record->toArray(), 'age' => $record->age()],
+            'customer' => $header,
             'customerId' => $record->id,
             'error' => null,
             ...$props($record),
@@ -203,18 +209,17 @@ class CustomerController extends Controller
      */
     private function accounts(string $customerId): array
     {
-        try {
-            return [array_map(fn (BillingAccount $account) => $account->toArray(), $this->billing->accountsForCustomer($customerId)), null];
-        } catch (QueueServiceException|TaskFailedException $e) {
-            Log::warning('Billing unavailable for customer page', ['customer_id' => $customerId, 'error' => $e->getMessage()]);
-
-            return [null, 'Billing information is unavailable right now.'];
-        }
+        return Section::load(
+            fn () => array_map(fn (BillingAccount $account) => $account->toArray(), $this->billing->accountsForCustomer($customerId)),
+            'Billing information is unavailable right now.',
+            'Billing unavailable for customer page',
+            ['customer_id' => $customerId],
+        );
     }
 
     /**
      * One row per live number: the number itself (MSISDN Daemon) joined with its line, meaning
-     * tariff, locked-in price and allowances (Subscription Daemon). If subscriptions are down the
+     * tariff, locked-in price and allowances (Subscription Daemon). If subscriptions fail the
      * numbers still show, without tariffs.
      *
      * @param  list<array<string, mixed>>  $accounts
@@ -226,42 +231,38 @@ class CustomerController extends Controller
         $accountIds = array_column($accounts, 'id');
         $accountNumbers = array_column($accounts, 'account_number', 'id');
 
-        try {
-            $byAccount = $this->numbers->linesForAccounts($accountIds);
-        } catch (QueueServiceException|TaskFailedException $e) {
-            Log::warning('Numbers unavailable for customer page', ['customer_id' => $customerId, 'error' => $e->getMessage()]);
+        [$numbers, $numbersError] = Section::load(function () use ($accountIds, $accountNumbers) {
+            $numbers = [];
+            foreach ($this->numbers->linesForAccounts($accountIds) as $accountId => $accountLines) {
+                foreach ($accountLines as $number) {
+                    $numbers[] = [...$number->toArray(), 'account_id' => $accountId, 'account_number' => $accountNumbers[$accountId] ?? null];
+                }
+            }
 
-            return [null, 'Mobile numbers are unavailable right now.', null];
+            return $numbers;
+        }, 'Mobile numbers are unavailable right now.', 'Numbers unavailable for customer page', ['customer_id' => $customerId]);
+
+        if ($numbers === null) {
+            return [null, $numbersError, null];
         }
 
-        $subscriptionsError = null;
-
-        try {
+        /** @var array<string, array<string, mixed>>|null $lines tariff line per msisdn */
+        [$lines, $subscriptionsError] = Section::load(function () use ($accountIds) {
             $lines = [];
             foreach ($this->subscriptions->linesForAccounts($accountIds) as $accountLines) {
                 foreach ($accountLines as $line) {
-                    $lines[$line->msisdn] = $line;
+                    $lines[$line->msisdn] = $line->toArray();
                 }
             }
-        } catch (QueueServiceException|TaskFailedException $e) {
-            Log::warning('Subscriptions unavailable for customer page', ['customer_id' => $customerId, 'error' => $e->getMessage()]);
-            $lines = null;
-            $subscriptionsError = 'Tariffs are unavailable right now.';
-        }
 
-        $rows = [];
+            return $lines;
+        }, 'Tariffs are unavailable right now.', 'Subscriptions unavailable for customer page', ['customer_id' => $customerId]);
 
-        foreach ($byAccount as $accountId => $accountLines) {
-            foreach ($accountLines as $number) {
-                $rows[] = [
-                    ...$number->toArray(),
-                    'account_id' => $accountId,
-                    'account_number' => $accountNumbers[$accountId] ?? null,
-                    // null when subscriptions are down; false when the number has no line (shouldn't happen).
-                    'subscription' => $lines === null ? null : (isset($lines[$number->msisdn]) ? $lines[$number->msisdn]->toArray() : false),
-                ];
-            }
-        }
+        $rows = array_map(fn (array $number) => [
+            ...$number,
+            // null when subscriptions are unavailable; false when the number has no line (shouldn't happen).
+            'subscription' => $lines === null ? null : ($lines[$number['msisdn']] ?? false),
+        ], $numbers);
 
         return [$rows, null, $subscriptionsError];
     }

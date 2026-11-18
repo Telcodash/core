@@ -8,8 +8,8 @@ use App\Services\Customers\Data\Customer;
 use App\Services\Numbers\NumberDirectory;
 use App\Services\TaskQueue\QueueServiceException;
 use App\Services\TaskQueue\TaskFailedException;
+use App\Support\Section;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Customer search across the daemons, for the UI. Each daemon answers what it owns:
@@ -101,12 +101,10 @@ class CustomerAccountSearch
      */
     private function accountsFor(array $customers): ?array
     {
-        try {
-            return $this->billing->summariesForCustomers(array_values(array_map(fn (Customer $c) => $c->id, $customers)));
-        } catch (QueueServiceException|TaskFailedException $e) {
-            Log::warning('Billing accounts unavailable for search results', ['error' => $e->getMessage()]);
-
-            return null;
-        }
+        return Section::load(
+            fn () => $this->billing->summariesForCustomers(array_values(array_map(fn (Customer $c) => $c->id, $customers))),
+            'Billing accounts are unavailable right now.',
+            'Billing accounts unavailable for search results',
+        )[0];
     }
 }

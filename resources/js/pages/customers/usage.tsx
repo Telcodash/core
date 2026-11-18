@@ -1,3 +1,4 @@
+import { withErrorBoundary } from '@/components/error-boundary';
 import { Link } from '@inertiajs/react';
 import {
     AlertCircle,
@@ -185,7 +186,7 @@ function Swatch({ series, dashed }: { series: 1 | 2; dashed?: boolean }) {
 }
 
 /** This period so far against its allowance, and against the same point of the compared period. */
-function MetricTile({
+function MetricTileContent({
     metric,
     current,
     compare,
@@ -282,7 +283,7 @@ function MetricTile({
 }
 
 /** Running totals through the period, day by day: the current period against the compared one. */
-function ComparisonChart({
+function ComparisonChartContent({
     metric,
     current,
     compare,
@@ -460,7 +461,7 @@ function ComparisonChart({
 }
 
 /** Each period's total, oldest first; the current period is marked as "so far". */
-function PeriodsChart({
+function PeriodsChartContent({
     metric,
     periods,
     compareIndex,
@@ -604,7 +605,7 @@ function PeriodsChart({
 }
 
 /** Every period's numbers: the table view of both charts, plus roaming and international calls. */
-function PeriodsTable({ periods }: { periods: Period[] }) {
+function PeriodsTableContent({ periods }: { periods: Period[] }) {
     const cell = (p: Period, metric: Metric) => {
         const cap = p.allowances?.[metric] ?? null;
         const over = cap !== null && p.totals[metric] > cap;
@@ -999,3 +1000,19 @@ NumberUsage.layout = (
         ]),
     };
 };
+
+const MetricTile = withErrorBoundary(MetricTileContent, {
+    label: 'this figure',
+});
+
+const ComparisonChart = withErrorBoundary(ComparisonChartContent, {
+    label: 'this chart',
+});
+
+const PeriodsChart = withErrorBoundary(PeriodsChartContent, {
+    label: 'this chart',
+});
+
+const PeriodsTable = withErrorBoundary(PeriodsTableContent, {
+    label: 'the usage table',
+});

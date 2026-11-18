@@ -6,13 +6,13 @@ use App\Models\Team;
 use App\Services\Billing\BillingDirectory;
 use App\Services\Customers\CustomerDirectory;
 use App\Services\Numbers\NumberDirectory;
-use App\Services\TaskQueue\QueueServiceException;
-use App\Services\TaskQueue\TaskFailedException;
 use App\Services\Usage\UsageDirectory;
+use App\Support\Section;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class NumberUsageController extends Controller
 {
@@ -44,8 +44,8 @@ class NumberUsageController extends Controller
         try {
             $owner = $numbers->ownerOf($msisdn);
             $account = $owner !== null && $owner['target_type'] === 'account' ? $billing->findAccount($owner['target_id']) : null;
-        } catch (QueueServiceException|TaskFailedException $e) {
-            Log::warning('Number ownership unavailable for usage page', ['msisdn' => $msisdn, 'error' => $e->getMessage()]);
+        } catch (Throwable $e) {
+            Section::absorb($e, 'Number ownership unavailable for usage page', ['msisdn' => $msisdn]);
 
             return $this->render(['id' => $customer, 'full_name' => null, 'status' => null, 'created_at' => null], $number, null, 'Usage is unavailable right now: this number’s account couldn’t be checked. Please try again shortly.');
         }
@@ -62,28 +62,27 @@ class NumberUsageController extends Controller
 
         $number += ['account_number' => $account->accountNumber, 'billing_day' => $account->billingDay];
 
-        try {
+        // Only used for the header and breadcrumb: without it the page still shows the usage.
+        [$header] = Section::load(function () use ($customers, $customer) {
             $record = $customers->find($customer);
-        } catch (QueueServiceException|TaskFailedException) {
-            $record = null; // Only used for the header and breadcrumb.
-        }
 
-        $header = [
-            'id' => $customer,
-            'full_name' => $record?->fullName(),
-            'status' => $record?->status,
-            'created_at' => $record?->createdAt->toIso8601String(),
-        ];
+            return [
+                'id' => $customer,
+                'full_name' => $record?->fullName(),
+                'status' => $record?->status,
+                'created_at' => $record?->createdAt->toIso8601String(),
+            ];
+        }, 'Customer details are unavailable right now.', 'Customer header unavailable for usage page', ['customer_id' => $customer]);
+        $header ??= ['id' => $customer, 'full_name' => null, 'status' => null, 'created_at' => null];
 
-        try {
-            $report = $usage->forNumber($msisdn, $account->billingDay, self::PERIODS)->toArray();
-        } catch (QueueServiceException|TaskFailedException $e) {
-            Log::warning('Usage unavailable', ['msisdn' => $msisdn, 'error' => $e->getMessage()]);
+        [$report, $error] = Section::load(
+            fn () => $usage->forNumber($msisdn, $account->billingDay, self::PERIODS)->toArray(),
+            'Usage is unavailable right now. Please try again shortly.',
+            'Usage unavailable',
+            ['msisdn' => $msisdn],
+        );
 
-            return $this->render($header, $number, null, 'Usage is unavailable right now. Please try again shortly.');
-        }
-
-        return $this->render($header, $number, $report, null);
+        return $this->render($header, $number, $report, $error);
     }
 
     /**

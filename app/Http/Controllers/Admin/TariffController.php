@@ -8,6 +8,7 @@ use App\Services\Subscriptions\Data\Tariff;
 use App\Services\Subscriptions\SubscriptionDirectory;
 use App\Services\TaskQueue\QueueServiceException;
 use App\Services\TaskQueue\TaskFailedException;
+use App\Support\Section;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -19,16 +20,14 @@ class TariffController extends Controller
 {
     public function index(SubscriptionDirectory $subscriptions): Response
     {
-        try {
-            $tariffs = array_map(fn (Tariff $tariff) => $tariff->toArray(), $subscriptions->tariffs());
-            $error = null;
-        } catch (QueueServiceException|TaskFailedException) {
-            $tariffs = [];
-            $error = 'The tariff catalogue is unavailable right now. Please try again shortly.';
-        }
+        [$tariffs, $error] = Section::load(
+            fn () => array_map(fn (Tariff $tariff) => $tariff->toArray(), $subscriptions->tariffs()),
+            'The tariff catalogue is unavailable right now. Please try again shortly.',
+            'Tariff catalogue unavailable',
+        );
 
         return Inertia::render('admin/tariffs/index', [
-            'tariffs' => $tariffs,
+            'tariffs' => $tariffs ?? [],
             'error' => $error,
         ]);
     }

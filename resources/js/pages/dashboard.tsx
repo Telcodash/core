@@ -1,3 +1,4 @@
+import { withErrorBoundary } from '@/components/error-boundary';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertCircle,
@@ -362,7 +363,7 @@ export default function Dashboard({
     );
 }
 
-function ResultsTable({
+function ResultsTableContent({
     customers,
     teamSlug,
 }: {
@@ -500,4 +501,8 @@ Dashboard.layout = (props: { currentTeam?: { slug: string } | null }) => ({
             href: props.currentTeam ? dashboard(props.currentTeam.slug) : '/',
         },
     ],
+});
+
+const ResultsTable = withErrorBoundary(ResultsTableContent, {
+    label: 'the search results',
 });

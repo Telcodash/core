@@ -1,3 +1,4 @@
+import { withErrorBoundary } from '@/components/error-boundary';
 import { Form, Link, usePage } from '@inertiajs/react';
 import {
     BarChart3,
@@ -213,7 +214,7 @@ function RenameDialog({
  * The customer's mobile numbers (MSISDNs) with tariff, monthly cost and allowances.
  * Right-click a row, or use its "⋯" button, for the number's actions (Usage first).
  */
-export function NumbersTable({
+function NumbersTableContent({
     numbers,
     customerId,
 }: {
@@ -431,3 +432,7 @@ export function NumbersTable({
         </>
     );
 }
+
+export const NumbersTable = withErrorBoundary(NumbersTableContent, {
+    label: 'the numbers table',
+});

@@ -8,8 +8,8 @@ use App\Models\QueueTask;
 use App\Services\Billing\BillingDirectory;
 use App\Services\TaskQueue\QueueServiceClient;
 use App\Services\TaskQueue\QueueServiceException;
-use App\Services\TaskQueue\TaskFailedException;
 use App\Services\TaskQueue\TaskQueue;
+use App\Support\Section;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -28,13 +28,11 @@ class ServiceController extends Controller
         return Inertia::render('admin/services/index', [
             'queue' => fn () => $this->queueStatus($client),
             // Proof the Billing Daemon's daily run is happening: null if it can't be reached.
-            'billingRuns' => function () use ($billing): ?array {
-                try {
-                    return $billing->recentRuns(7);
-                } catch (QueueServiceException|TaskFailedException) {
-                    return null;
-                }
-            },
+            'billingRuns' => fn (): ?array => Section::load(
+                fn () => $billing->recentRuns(7),
+                'Billing runs are unavailable right now.',
+                'Billing runs unavailable for services page',
+            )[0],
         ]);
     }
 

@@ -16,6 +16,8 @@ class CustomerPagesTest extends TestCase
 
     private const CUSTOMER_ID = 'cus_01A24B7MY1G5VD193QWE5EZXAV';
 
+    private const ACCOUNT_ID = 'acc_01A7DM1QT4J21DF5TF9A6EH132';
+
     private User $user;
 
     protected function setUp(): void
@@ -166,6 +168,17 @@ class CustomerPagesTest extends TestCase
                 ->where('error', 'Customer search is unavailable right now. Please try again shortly.'));
     }
 
+    public function test_a_malformed_search_response_shows_an_error_not_a_500(): void
+    {
+        $this->fakeDaemons(['customers.search' => ['data' => 'nonsense']]);
+
+        $this->actingAs($this->user)->get($this->searchUrl(['q' => 'ada']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('results', null)
+                ->where('error', 'Customer search failed. Please try again shortly.'));
+    }
+
     public function test_overview_summarises_details_accounts_and_numbers_and_audits_access(): void
     {
         Log::spy();
@@ -287,6 +300,61 @@ class CustomerPagesTest extends TestCase
                     ->where('numbers', null)
                     ->where('billingError', null)
                     ->whereType('numbersError', 'string'));
+        }
+    }
+
+    public function test_a_malformed_daemon_response_degrades_only_its_section_and_is_reported(): void
+    {
+        Log::spy();
+        $this->fakeDaemons([
+            'customers.get' => self::customerFixture(),
+            'accounts.for_customer' => [self::accountFixture()],
+            // Not a map of account id => lines: a bug or a contract change in the daemon.
+            'numbers.for_accounts' => fn () => [self::ACCOUNT_ID => 'nonsense'],
+            'lines.for_accounts' => fn (array $p) => [$p['account_ids'][0] => [self::subscriptionFixture()]],
+        ]);
+
+        foreach (['show', 'numbers'] as $view) {
+            $this->actingAs($this->user)->get($this->customerUrl(view: $view))
+                ->assertOk()
+                ->assertInertia(fn (Assert $page) => $page
+                    ->where('customer.full_name', 'Dr Ada Lovelace')
+                    ->where('numbers', null)
+                    ->where('numbersError', 'Mobile numbers are unavailable right now.')
+                    ->where('billingError', null));
+        }
+
+        Log::shouldHaveReceived('error')->withArgs(fn (string $message, array $context) => $message === 'Numbers unavailable for customer overview'
+            && str_starts_with($context['error'], 'UnexpectedValueException'));
+    }
+
+    public function test_tariffs_failing_unexpectedly_still_shows_the_numbers(): void
+    {
+        $this->fakeDaemons([
+            'customers.get' => self::customerFixture(),
+            'accounts.for_customer' => [self::accountFixture()],
+            'numbers.for_accounts' => fn (array $p) => [$p['account_ids'][0] => [self::lineFixture()]],
+            'lines.for_accounts' => fn () => 'nonsense',
+        ]);
+
+        $this->actingAs($this->user)->get($this->customerUrl(view: 'numbers'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('numbers.0.national', '07700 910123')
+                ->where('numbers.0.subscription', null)
+                ->where('subscriptionsError', 'Tariffs are unavailable right now.'));
+    }
+
+    public function test_a_malformed_customer_shows_an_error_in_place_of_the_view_not_a_500(): void
+    {
+        $this->fakeDaemons(['customers.get' => ['id' => self::CUSTOMER_ID]]); // missing every field
+
+        foreach (['show', 'details', 'numbers', 'billing'] as $view) {
+            $this->actingAs($this->user)->get($this->customerUrl(view: $view))
+                ->assertOk()
+                ->assertInertia(fn (Assert $page) => $page
+                    ->where('customer', null)
+                    ->where('error', 'Customer details are unavailable right now. Please try again shortly.'));
         }
     }
 

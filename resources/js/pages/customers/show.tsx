@@ -23,6 +23,7 @@ import {
     formatDate,
     formatMoney,
 } from '@/components/customer-status';
+import { ErrorBoundary } from '@/components/error-boundary';
 import { PaneLink, useSidePane } from '@/components/side-pane';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -103,7 +104,12 @@ function SummaryCard({
                     <ArrowRight className="size-3.5 transition-transform duration-200 group-hover/link:translate-x-0.5" />
                 </PaneLink>
             </CardHeader>
-            <CardContent className="text-sm">{children}</CardContent>
+            <CardContent className="text-sm">
+                {/* One card failing leaves the other summaries readable. */}
+                <ErrorBoundary label={`the ${title.toLowerCase()} summary`}>
+                    {children}
+                </ErrorBoundary>
+            </CardContent>
         </Card>
     );
 }
@@ -353,22 +359,33 @@ export default function CustomerOverview({
                                                     >
                                                         <Smartphone className="mt-1 size-3.5 shrink-0 text-muted-foreground" />
                                                         <div className="min-w-0 flex-1">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="font-mono tabular-nums">
-                                                                    {n.national}
+                                                            {/* Named numbers lead with the name; the number is the subtext. */}
+                                                            <div className="flex min-w-0 items-center gap-2">
+                                                                <span
+                                                                    className={cn(
+                                                                        'truncate',
+                                                                        n.friendly_name
+                                                                            ? 'font-medium'
+                                                                            : 'font-mono tabular-nums',
+                                                                    )}
+                                                                    data-test="overview-number-label"
+                                                                >
+                                                                    {n.friendly_name ??
+                                                                        n.national}
                                                                 </span>
                                                                 {n.status ===
                                                                     'barred' && (
-                                                                    <Badge variant="destructive">
+                                                                    <Badge
+                                                                        variant="destructive"
+                                                                        className="shrink-0"
+                                                                    >
                                                                         Barred
                                                                     </Badge>
                                                                 )}
                                                             </div>
                                                             {n.friendly_name && (
-                                                                <p className="truncate text-xs text-muted-foreground">
-                                                                    {
-                                                                        n.friendly_name
-                                                                    }
+                                                                <p className="font-mono text-xs text-muted-foreground tabular-nums">
+                                                                    {n.national}
                                                                 </p>
                                                             )}
                                                         </div>

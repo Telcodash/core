@@ -1,3 +1,4 @@
+import { withErrorBoundary } from '@/components/error-boundary';
 import {
     AlertTriangle,
     CalendarClock,
@@ -365,7 +366,7 @@ function InvoiceRow({ invoice }: { invoice: Invoice }) {
     );
 }
 
-export function BillingAccountCard({ account }: { account: BillingAccount }) {
+function BillingAccountCardContent({ account }: { account: BillingAccount }) {
     const method = account.payment_method;
 
     return (
@@ -544,3 +545,7 @@ export function BillingAccountCard({ account }: { account: BillingAccount }) {
         </Card>
     );
 }
+
+export const BillingAccountCard = withErrorBoundary(BillingAccountCardContent, {
+    label: 'this billing account',
+});
