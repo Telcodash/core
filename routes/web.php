@@ -64,6 +64,11 @@ Route::prefix('{current_team}')
             ->where(['customer' => 'cus_[0-9A-HJKMNP-TV-Z]{26}', 'msisdn' => '447\d{9}'])
             ->name('customers.usage');
 
+        Route::patch('customers/{customer}/numbers/{msisdn}', [CustomerController::class, 'renameNumber'])
+            ->where(['customer' => 'cus_[0-9A-HJKMNP-TV-Z]{26}', 'msisdn' => '447\d{9}'])
+            ->middleware('throttle:30,1')
+            ->name('customers.rename-number');
+
         Route::get('team', [TeamMemberController::class, 'index'])->name('team.index');
 
         Route::patch('team/members/{member}', [TeamMemberController::class, 'update'])

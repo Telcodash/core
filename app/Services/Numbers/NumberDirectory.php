@@ -94,6 +94,29 @@ class NumberDirectory
     }
 
     /**
+     * Set or clear (null / blank) a number's friendly name. The daemon refuses unless the number is
+     * live on one of $accountIds, so pass the accounts of the customer being edited.
+     *
+     * @param  list<string>  $accountIds
+     * @return string|null the name as stored (trimmed), or null if cleared
+     */
+    public function rename(string $msisdn, array $accountIds, ?string $friendlyName): ?string
+    {
+        $result = $this->call('numbers.rename', [
+            'msisdn' => $msisdn,
+            'account_ids' => array_values(array_unique($accountIds)),
+            'friendly_name' => $friendlyName,
+        ]);
+
+        if (! is_array($result)) {
+            throw new UnexpectedValueException('Malformed numbers.rename response.');
+        }
+
+        /** @var array<string, mixed> $result */
+        return Payload::nullableString($result, 'friendly_name');
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      */
     private function call(string $task, array $payload): mixed

@@ -23,6 +23,8 @@ final readonly class Line implements Arrayable
         /** active | barred */
         public string $status,
         public ?string $barredReason,
+        /** The customer's own label for the number, e.g. "Dad's phone" */
+        public ?string $friendlyName,
         public CarbonImmutable $assignedAt,
     ) {}
 
@@ -37,6 +39,7 @@ final readonly class Line implements Arrayable
             classification: Payload::string($data, 'classification'),
             status: Payload::string($data, 'status'),
             barredReason: Payload::nullableString($data, 'barred_reason'),
+            friendlyName: Payload::nullableString($data, 'friendly_name'),
             assignedAt: Payload::date($data, 'assigned_at'),
         );
     }
@@ -52,6 +55,7 @@ final readonly class Line implements Arrayable
             'classification' => $this->classification,
             'status' => $this->status,
             'barred_reason' => $this->barredReason,
+            'friendly_name' => $this->friendlyName,
             'assigned_at' => $this->assignedAt->toIso8601String(),
         ];
     }

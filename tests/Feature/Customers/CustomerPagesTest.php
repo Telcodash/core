@@ -188,6 +188,8 @@ class CustomerPagesTest extends TestCase
                 ->where('numbers.0.national', '07700 910123')
                 ->where('numbers.0.status', 'barred')
                 ->where('numbers.0.account_id', 'acc_01A7DM1QT4J21DF5TF9A6EH132')
+                ->where('numbers.0.account_number', '4883209140')
+                ->where('numbers.0.friendly_name', 'Work phone')
                 ->missing('numbers.0.subscription')
                 ->where('billingError', null)
                 ->where('numbersError', null));
@@ -234,6 +236,7 @@ class CustomerPagesTest extends TestCase
                 ->where('numbers.0.status', 'barred')
                 ->where('numbers.0.classification', 'gold')
                 ->where('numbers.0.account_number', '4883209140')
+                ->where('numbers.0.friendly_name', 'Work phone')
                 ->where('numbers.0.subscription.tariff_name', 'Everyday 30GB')
                 ->where('numbers.0.subscription.monthly_price_pence', 1600)
                 ->where('numbers.0.subscription.allowances', [

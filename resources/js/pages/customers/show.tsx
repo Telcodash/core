@@ -1,9 +1,10 @@
-import { Link } from '@inertiajs/react';
+import { usePage } from '@inertiajs/react';
 import {
     AlertCircle,
     AlertTriangle,
     ArrowRight,
     Cake,
+    ChevronRight,
     Mail,
     MapPin,
     Phone,
@@ -22,10 +23,12 @@ import {
     formatDate,
     formatMoney,
 } from '@/components/customer-status';
+import { PaneLink, useSidePane } from '@/components/side-pane';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { usage } from '@/routes/customers';
 import type { Customer } from '@/pages/customers/details';
 
 type AccountSummary = Omit<BillingAccount, 'invoices'>;
@@ -36,7 +39,9 @@ type NumberSummary = {
     classification: string;
     status: 'active' | 'barred';
     barred_reason: string | null;
+    friendly_name: string | null;
     account_id: string;
+    account_number: string | null;
 };
 
 type Props = {
@@ -54,7 +59,16 @@ type Props = {
 /** Numbers listed on the overview before "and N more". */
 const NUMBERS_SHOWN = 4;
 
-/** A summary card that links to the full view. */
+/**
+ * Every item on the overview is a link that opens its page in the side pane. `data-active` marks
+ * the item the pane is showing.
+ */
+const ROW =
+    'group/row -mx-2 block rounded-lg px-2 py-1.5 outline-none transition-[background-color,box-shadow] duration-200 hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring data-active:bg-primary/10 data-active:ring-1 data-active:ring-primary/30';
+
+type Href = ReturnType<ReturnType<typeof useCustomerUrl>>;
+
+/** A summary card that links to the full view, outlined while the pane shows that view. */
 function SummaryCard({
     title,
     href,
@@ -63,22 +77,31 @@ function SummaryCard({
     test,
 }: {
     title: string;
-    href: ReturnType<ReturnType<typeof useCustomerUrl>>;
+    href: Href;
     linkLabel: string;
     children: ReactNode;
     test: string;
 }) {
+    const showing = useSidePane()?.isShowing(href.url, 'prefix') ?? false;
+
     return (
-        <Card className="gap-4" data-test={test}>
+        <Card
+            className={cn(
+                'gap-4 transition-shadow duration-300',
+                showing && 'ring-2 ring-primary/40',
+            )}
+            data-test={test}
+            data-showing={showing || undefined}
+        >
             <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <CardTitle className="text-base">{title}</CardTitle>
-                <Link
+                <PaneLink
                     href={href}
-                    className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                    className="group/link inline-flex items-center gap-1 rounded-sm text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     {linkLabel}
-                    <ArrowRight className="size-3.5" />
-                </Link>
+                    <ArrowRight className="size-3.5 transition-transform duration-200 group-hover/link:translate-x-0.5" />
+                </PaneLink>
             </CardHeader>
             <CardContent className="text-sm">{children}</CardContent>
         </Card>
@@ -94,31 +117,43 @@ function Unavailable({ children }: { children: ReactNode }) {
     );
 }
 
+/** A headline figure that opens its view. */
 function Figure({
     label,
     value,
     tone,
+    href,
 }: {
     label: string;
     value: ReactNode;
     tone?: 'danger';
+    href: Href;
 }) {
     return (
-        <div>
-            <dt className="text-xs text-muted-foreground">{label}</dt>
-            <dd
-                className={cn(
-                    'mt-0.5 text-lg font-semibold tabular-nums',
-                    tone === 'danger' && 'text-red-700 dark:text-red-400',
-                )}
-            >
-                {value}
-            </dd>
-        </div>
+        <PaneLink href={href} className={ROW}>
+            <dl>
+                <dt className="text-xs text-muted-foreground">{label}</dt>
+                <dd
+                    className={cn(
+                        'mt-0.5 text-lg font-semibold tabular-nums',
+                        tone === 'danger' && 'text-red-700 dark:text-red-400',
+                    )}
+                >
+                    {value}
+                </dd>
+            </dl>
+        </PaneLink>
     );
 }
 
-/** The customer at a glance: a short summary of each view, linking to it. */
+/** A trailing chevron that appears on hover, hinting a row opens something. */
+function RowChevron() {
+    return (
+        <ChevronRight className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-[opacity,translate] duration-200 group-hover/row:translate-x-0.5 group-hover/row:opacity-100 group-focus-visible/row:opacity-100 group-data-active/row:opacity-100" />
+    );
+}
+
+/** The customer at a glance: a short summary of each view. Everything opens beside it. */
 export default function CustomerOverview({
     customerId,
     customer,
@@ -129,6 +164,15 @@ export default function CustomerOverview({
     numbersError,
 }: Props) {
     const url = useCustomerUrl();
+    const { currentTeam } = usePage().props;
+    const team = currentTeam?.slug ?? '';
+    const detailsUrl = url('details', customerId);
+    const numbersUrl = url('numbers', customerId);
+    const billingUrl = url('billing', customerId);
+    const accountUrl = (id: string) => `${billingUrl.url}#${id}`;
+    const usageUrl = (msisdn: string) =>
+        usage({ current_team: team, customer: customerId, msisdn });
+
     const open = accounts?.filter((a) => a.status !== 'closed') ?? [];
     const inArrears = open.filter((a) => a.suspension_reason === 'arrears');
     const barred = numbers?.filter((n) => n.status === 'barred') ?? [];
@@ -155,9 +199,22 @@ export default function CustomerOverview({
                             <AlertTitle>Suspended for arrears</AlertTitle>
                             <AlertDescription>
                                 <p>
-                                    {inArrears.length === 1
-                                        ? `Account ${inArrears[0].account_number} is`
-                                        : `${inArrears.length} accounts are`}{' '}
+                                    {inArrears.length === 1 ? (
+                                        <>
+                                            Account{' '}
+                                            <PaneLink
+                                                href={accountUrl(
+                                                    inArrears[0].id,
+                                                )}
+                                                className="font-mono underline underline-offset-2"
+                                            >
+                                                {inArrears[0].account_number}
+                                            </PaneLink>{' '}
+                                            is
+                                        </>
+                                    ) : (
+                                        `${inArrears.length} accounts are`
+                                    )}{' '}
                                     suspended with{' '}
                                     {formatMoney(
                                         inArrears.reduce(
@@ -167,16 +224,21 @@ export default function CustomerOverview({
                                         ),
                                     )}{' '}
                                     overdue, and{' '}
-                                    {barred.length === 1
-                                        ? '1 number is'
-                                        : `${barred.length} numbers are`}{' '}
+                                    <PaneLink
+                                        href={numbersUrl}
+                                        className="underline underline-offset-2"
+                                    >
+                                        {barred.length === 1
+                                            ? '1 number is'
+                                            : `${barred.length} numbers are`}
+                                    </PaneLink>{' '}
                                     barred.{' '}
-                                    <Link
-                                        href={url('billing', customerId)}
+                                    <PaneLink
+                                        href={billingUrl}
                                         className="font-medium underline underline-offset-2"
                                     >
                                         View billing
-                                    </Link>
+                                    </PaneLink>
                                 </p>
                             </AlertDescription>
                         </Alert>
@@ -185,33 +247,63 @@ export default function CustomerOverview({
                     <div className="grid gap-4 lg:grid-cols-3">
                         <SummaryCard
                             title="Details"
-                            href={url('details', customerId)}
+                            href={detailsUrl}
                             linkLabel="All details"
                             test="overview-details"
                         >
-                            <dl className="space-y-3">
-                                <Detail icon={<Cake />} label="Date of birth">
-                                    {formatDate(customer.date_of_birth)}{' '}
-                                    <span className="text-muted-foreground">
-                                        (age {customer.age})
-                                    </span>
-                                </Detail>
-                                <Detail icon={<Phone />} label="Contact phone">
-                                    {customer.contact_phone}
-                                </Detail>
-                                <Detail icon={<Mail />} label="Email">
-                                    {customer.email}
-                                </Detail>
-                                <Detail icon={<MapPin />} label="Lives in">
-                                    {customer.address.town},{' '}
-                                    {customer.address.postcode}
-                                </Detail>
-                            </dl>
+                            <div className="space-y-1">
+                                {[
+                                    {
+                                        icon: <Cake />,
+                                        label: 'Date of birth',
+                                        value: (
+                                            <>
+                                                {formatDate(
+                                                    customer.date_of_birth,
+                                                )}{' '}
+                                                <span className="text-muted-foreground">
+                                                    (age {customer.age})
+                                                </span>
+                                            </>
+                                        ),
+                                    },
+                                    {
+                                        icon: <Phone />,
+                                        label: 'Contact phone',
+                                        value: customer.contact_phone,
+                                    },
+                                    {
+                                        icon: <Mail />,
+                                        label: 'Email',
+                                        value: customer.email,
+                                    },
+                                    {
+                                        icon: <MapPin />,
+                                        label: 'Lives in',
+                                        value: `${customer.address.town}, ${customer.address.postcode}`,
+                                    },
+                                ].map((d) => (
+                                    <PaneLink
+                                        key={d.label}
+                                        href={detailsUrl}
+                                        className={ROW}
+                                    >
+                                        <dl>
+                                            <Detail
+                                                icon={d.icon}
+                                                label={d.label}
+                                            >
+                                                {d.value}
+                                            </Detail>
+                                        </dl>
+                                    </PaneLink>
+                                ))}
+                            </div>
                         </SummaryCard>
 
                         <SummaryCard
                             title="Numbers"
-                            href={url('numbers', customerId)}
+                            href={numbersUrl}
                             linkLabel="Tariffs and usage"
                             test="overview-numbers"
                         >
@@ -226,46 +318,88 @@ export default function CustomerOverview({
                                 </p>
                             ) : (
                                 <>
-                                    <dl className="mb-3 grid grid-cols-2 gap-3">
+                                    <div className="mb-2 grid grid-cols-2 gap-x-3">
                                         <Figure
                                             label="Live numbers"
                                             value={numbers.length}
+                                            href={numbersUrl}
                                         />
                                         <Figure
                                             label="Barred"
                                             value={barred.length}
+                                            href={numbersUrl}
                                             tone={
                                                 barred.length > 0
                                                     ? 'danger'
                                                     : undefined
                                             }
                                         />
-                                    </dl>
-                                    <ul className="space-y-1.5">
+                                    </div>
+                                    <ul className="space-y-0.5">
                                         {numbers
                                             .slice(0, NUMBERS_SHOWN)
                                             .map((n) => (
-                                                <li
-                                                    key={n.msisdn}
-                                                    className="flex items-center gap-2"
-                                                >
-                                                    <Smartphone className="size-3.5 text-muted-foreground" />
-                                                    <span className="font-mono tabular-nums">
-                                                        {n.national}
-                                                    </span>
-                                                    {n.status === 'barred' && (
-                                                        <Badge variant="destructive">
-                                                            Barred
-                                                        </Badge>
-                                                    )}
+                                                <li key={n.msisdn}>
+                                                    <PaneLink
+                                                        href={usageUrl(
+                                                            n.msisdn,
+                                                        )}
+                                                        highlight
+                                                        className={cn(
+                                                            ROW,
+                                                            'flex items-start gap-2',
+                                                        )}
+                                                        data-test="overview-number"
+                                                    >
+                                                        <Smartphone className="mt-1 size-3.5 shrink-0 text-muted-foreground" />
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-mono tabular-nums">
+                                                                    {n.national}
+                                                                </span>
+                                                                {n.status ===
+                                                                    'barred' && (
+                                                                    <Badge variant="destructive">
+                                                                        Barred
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
+                                                            {n.friendly_name && (
+                                                                <p className="truncate text-xs text-muted-foreground">
+                                                                    {
+                                                                        n.friendly_name
+                                                                    }
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        {n.account_number && (
+                                                            <span
+                                                                className="mt-0.5 shrink-0 font-mono text-xs text-muted-foreground"
+                                                                title="Billing account"
+                                                            >
+                                                                {
+                                                                    n.account_number
+                                                                }
+                                                            </span>
+                                                        )}
+                                                        <span className="mt-1">
+                                                            <RowChevron />
+                                                        </span>
+                                                    </PaneLink>
                                                 </li>
                                             ))}
                                     </ul>
                                     {numbers.length > NUMBERS_SHOWN && (
-                                        <p className="mt-2 text-xs text-muted-foreground">
+                                        <PaneLink
+                                            href={numbersUrl}
+                                            className={cn(
+                                                ROW,
+                                                'mt-1 text-xs text-muted-foreground',
+                                            )}
+                                        >
                                             and {numbers.length - NUMBERS_SHOWN}{' '}
                                             more
-                                        </p>
+                                        </PaneLink>
                                     )}
                                 </>
                             )}
@@ -273,7 +407,7 @@ export default function CustomerOverview({
 
                         <SummaryCard
                             title="Billing"
-                            href={url('billing', customerId)}
+                            href={billingUrl}
                             linkLabel="Accounts and invoices"
                             test="overview-billing"
                         >
@@ -285,21 +419,24 @@ export default function CustomerOverview({
                                 </p>
                             ) : (
                                 <>
-                                    <dl className="grid grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-2 gap-x-3">
                                         <Figure
                                             label="Monthly charge"
+                                            href={billingUrl}
                                             value={formatMoney(
                                                 sum('monthly_charge_pence'),
                                             )}
                                         />
                                         <Figure
                                             label="Balance"
+                                            href={billingUrl}
                                             value={formatMoney(
                                                 sum('balance_pence'),
                                             )}
                                         />
                                         <Figure
                                             label="Overdue"
+                                            href={billingUrl}
                                             value={formatMoney(
                                                 sum('overdue_pence'),
                                             )}
@@ -311,6 +448,7 @@ export default function CustomerOverview({
                                         />
                                         <Figure
                                             label="Next bill"
+                                            href={billingUrl}
                                             value={
                                                 <span className="text-base">
                                                     {nextBill
@@ -319,19 +457,29 @@ export default function CustomerOverview({
                                                 </span>
                                             }
                                         />
-                                    </dl>
-                                    <ul className="mt-3 space-y-1.5 border-t pt-3">
+                                    </div>
+                                    <ul className="mt-2 space-y-0.5 border-t pt-2">
                                         {accounts.map((a) => (
-                                            <li
-                                                key={a.id}
-                                                className="flex items-center justify-between gap-2"
-                                            >
-                                                <span className="font-mono text-xs">
-                                                    {a.account_number}
-                                                </span>
-                                                <CustomerStatusBadge
-                                                    status={a.status}
-                                                />
+                                            <li key={a.id}>
+                                                <PaneLink
+                                                    href={accountUrl(a.id)}
+                                                    highlight
+                                                    className={cn(
+                                                        ROW,
+                                                        'flex items-center justify-between gap-2',
+                                                    )}
+                                                    data-test="overview-account"
+                                                >
+                                                    <span className="font-mono text-xs">
+                                                        {a.account_number}
+                                                    </span>
+                                                    <span className="flex items-center gap-1">
+                                                        <CustomerStatusBadge
+                                                            status={a.status}
+                                                        />
+                                                        <RowChevron />
+                                                    </span>
+                                                </PaneLink>
                                             </li>
                                         ))}
                                     </ul>

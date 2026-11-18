@@ -2,6 +2,8 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import { AlertCircle, ArrowLeft, Check, Copy } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { CustomerStatusBadge, formatDate } from '@/components/customer-status';
+import { PageTransition } from '@/components/page-transition';
+import { isEmbeddedPane } from '@/components/side-pane';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useClipboard } from '@/hooks/use-clipboard';
@@ -109,9 +111,11 @@ function CustomerNav({ customerId }: { customerId: string }) {
 
     return (
         // No prefetching: opening a view fetches personal data and is audited, so only real visits should.
+        // The rule is an inset shadow and the indicator sits inside the nav: nothing overhangs its
+        // box, so it's exactly its tabs' height and only scrolls sideways (bar hidden) on phones.
         <nav
             aria-label="Customer"
-            className="-mx-1 flex gap-1 overflow-x-auto border-b"
+            className="-mx-1 flex [scrollbar-width:none] gap-1 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--color-border)] [&::-webkit-scrollbar]:hidden"
             data-test="customer-nav"
         >
             {SECTIONS.map(({ key, title }) => {
@@ -128,7 +132,7 @@ function CustomerNav({ customerId }: { customerId: string }) {
                         href={href}
                         aria-current={active ? 'page' : undefined}
                         className={cn(
-                            "relative -mb-px px-3 py-2.5 text-sm whitespace-nowrap transition-colors duration-200 after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:origin-center after:rounded-full after:bg-primary after:transition-transform after:duration-300 after:ease-(--ease-out-expo) after:content-['']",
+                            "relative shrink-0 px-3 py-2.5 text-sm whitespace-nowrap transition-colors duration-200 after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:origin-center after:rounded-full after:bg-primary after:transition-transform after:duration-300 after:ease-(--ease-out-expo) after:content-['']",
                             active
                                 ? 'font-medium text-foreground after:scale-x-100'
                                 : 'text-muted-foreground after:scale-x-0 hover:text-foreground hover:after:scale-x-50 hover:after:bg-primary/40',
@@ -163,6 +167,37 @@ export function CustomerShell({
     children: ReactNode;
 }) {
     const name = customer?.full_name ?? 'Customer';
+    const content =
+        customer === null ? (
+            <Alert variant="destructive">
+                <AlertCircle />
+                <AlertTitle>Couldn&apos;t load this customer</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+            </Alert>
+        ) : (
+            children
+        );
+
+    // In a side pane, just the view: the page beside it already shows who this is (the pane's
+    // title bar names the customer and view, from the page title).
+    if (isEmbeddedPane) {
+        return (
+            <>
+                <Head title={`${name} · ${title}`} />
+                <div
+                    className={cn(
+                        'mx-auto w-full max-w-6xl p-4 md:p-6',
+                        className,
+                    )}
+                >
+                    {/* The spacing goes on the transition's wrapper: it holds the view's sections. */}
+                    <PageTransition className="block space-y-6">
+                        {content}
+                    </PageTransition>
+                </div>
+            </>
+        );
+    }
 
     return (
         <>
@@ -213,17 +248,8 @@ export function CustomerShell({
                     <CustomerNav customerId={customerId} />
                 </div>
 
-                {customer === null ? (
-                    <Alert variant="destructive">
-                        <AlertCircle />
-                        <AlertTitle>
-                            Couldn&apos;t load this customer
-                        </AlertTitle>
-                        <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                ) : (
-                    children
-                )}
+                {/* Only the view transitions between a customer's views; the header stays put. */}
+                <PageTransition className="block space-y-6">{content}</PageTransition>
             </div>
         </>
     );

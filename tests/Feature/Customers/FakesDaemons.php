@@ -104,6 +104,7 @@ trait FakesDaemons
             'classification' => 'gold',
             'status' => $status,
             'barred_reason' => $status === 'barred' ? 'arrears' : null,
+            'friendly_name' => 'Work phone',
             'assignment_id' => 'asg_01A7DM1QT4J21DF5TF9A6EH132',
             'assigned_at' => '2020-03-01T10:00:00.000Z',
         ];

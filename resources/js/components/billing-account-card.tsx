@@ -370,7 +370,11 @@ export function BillingAccountCard({ account }: { account: BillingAccount }) {
 
     return (
         <Card
-            className={account.status === 'closed' ? 'opacity-75' : undefined}
+            id={account.id}
+            className={cn(
+                'scroll-mt-4',
+                account.status === 'closed' && 'opacity-75',
+            )}
             data-test="billing-account"
         >
             <CardHeader>

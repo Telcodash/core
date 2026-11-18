@@ -13,6 +13,7 @@ use App\Services\Subscriptions\SubscriptionDirectory;
 use App\Services\TaskQueue\QueueServiceException;
 use App\Services\TaskQueue\TaskFailedException;
 use Closure;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -23,7 +24,8 @@ use Inertia\Response;
  *
  *   Overview  a summary of everything below (customer, billing accounts, numbers)
  *   Details   personal details                  (Customer Account Daemon)
- *   Numbers   mobile numbers with tariffs       (MSISDN + Subscription Daemons)
+ *   Numbers   mobile numbers with tariffs       (MSISDN + Subscription Daemons); numbers can be given
+ *             a friendly name here
  *   Billing   accounts, invoices and payments   (Billing Daemon)
  *
  * Each view asks only the daemons it shows. Every view needs the customer for its header; if the
@@ -52,9 +54,10 @@ class CustomerController extends Controller
             if ($accounts !== null) {
                 try {
                     $numbers = [];
+                    $accountNumbers = array_column($accounts, 'account_number', 'id');
                     foreach ($this->numbers->linesForAccounts(array_column($accounts, 'id')) as $accountId => $lines) {
                         foreach ($lines as $line) {
-                            $numbers[] = [...$line->toArray(), 'account_id' => $accountId];
+                            $numbers[] = [...$line->toArray(), 'account_id' => $accountId, 'account_number' => $accountNumbers[$accountId] ?? null];
                         }
                     }
                 } catch (QueueServiceException|TaskFailedException $e) {
@@ -93,6 +96,45 @@ class CustomerController extends Controller
                 'subscriptionsError' => $subscriptionsError,
             ];
         });
+    }
+
+    /**
+     * Give one of the customer's numbers a friendly name (or clear it). The MSISDN Daemon checks the
+     * number is live on one of this customer's accounts, so a number can't be renamed from another
+     * customer's page.
+     */
+    public function renameNumber(Request $request, Team $current_team, string $customer, string $msisdn): RedirectResponse
+    {
+        /** @var array{friendly_name: string|null} $validated */
+        $validated = $request->validate([
+            'friendly_name' => ['present', 'nullable', 'string', 'max:40'],
+        ]);
+
+        try {
+            $accountIds = array_map(fn (BillingAccount $account) => $account->id, $this->billing->accountsForCustomer($customer));
+            abort_if($accountIds === [], 404);
+
+            $name = $this->numbers->rename($msisdn, $accountIds, $validated['friendly_name']);
+        } catch (TaskFailedException $e) {
+            return back()->withErrors(['friendly_name' => preg_replace('/^Invalid payload: /', '', $e->reason)]);
+        } catch (QueueServiceException $e) {
+            Log::warning('Number rename unavailable', ['customer_id' => $customer, 'error' => $e->getMessage()]);
+
+            return back()->withErrors(['friendly_name' => 'Numbers can\'t be renamed right now. Please try again shortly.']);
+        }
+
+        // Changes to a customer's record are auditable, like views. The name itself isn't logged.
+        Log::info('Customer number renamed', [
+            'customer_id' => $customer,
+            'msisdn' => $msisdn,
+            'cleared' => $name === null,
+            'user_id' => $request->user()?->id,
+            'team_id' => $current_team->id,
+        ]);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => $name === null ? __('Friendly name removed.') : __('Number renamed.')]);
+
+        return back();
     }
 
     public function billing(Request $request, Team $current_team, string $customer): Response
